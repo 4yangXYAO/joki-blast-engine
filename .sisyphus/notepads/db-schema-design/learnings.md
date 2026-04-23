@@ -1,0 +1,4 @@
+- Created TypeScript interfaces for the database schema in src/types/db.ts to model Accounts, Templates, Jobs, Posts, Schedules, Credentials, and Logs.
+- Defined migrations/001_init.sql with the full CREATE TABLE IF NOT EXISTS statements using TEXT IDs and DATETIME strings per guidelines.
+- Implemented scripts/db-init.ts to initialize SQLite with WAL mode and apply migrations, and scripts/db-validate.ts as a stub validator.
+- Plan ensures data/app.db will be created by running npm run db:init in a properly provisioned environment.

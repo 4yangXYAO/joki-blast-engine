@@ -1,0 +1,18 @@
+{
+  "name": "joki-blast-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "db:init": "ts-node ./scripts/db-init.ts",
+    "db:validate": "node ./scripts/db-validate.ts",
+    "validate:config": "node -r ts-node/register ./scripts/validate-config.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^7.4.0"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.0.4"
+  }
+}

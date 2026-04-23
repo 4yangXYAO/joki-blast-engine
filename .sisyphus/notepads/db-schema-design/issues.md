@@ -1,0 +1,2 @@
+- No major blockers identified yet. Current blockers: Node native module build on Windows for better-sqlite3 during npm install.
+- Potential mitigation: Use WSL/Linux environment or prebuilt binaries compatible with Node 24+.
