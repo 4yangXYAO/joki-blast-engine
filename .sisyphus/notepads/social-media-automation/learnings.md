@@ -4,3 +4,9 @@
 - Created route stubs for accounts, templates, posts, jobs, and adapters under src/routes/ with basic validation schemas.
 - Ensured config loading pattern: call loadConfig() before getConfig() and read port from API_PORT for server startup.
 - Next steps: integrate real business logic in route handlers as MVP expands and possibly add tests for validation paths.
+WhatsApp Adapter (Cloud API + whatsapp-web.js) implemented in this sprint.
+- Added IAdapter.ts to standardize adapter interfaces.
+- Implemented WhatsAppAdapter with dual-mode support (cloud-api and webjs) and a simple in-memory rate limiter.
+- Created a basic secrets.ts scaffold to hold tokens without committing real credentials.
+- Wrote unit tests (src/adapters/whatsapp.test.ts) with mocks to verify interface contracts, rate limiting, and basic send flow.
+- Next: wire tests to full integration, map real error responses, and avoid real API calls in CI by using mocks.

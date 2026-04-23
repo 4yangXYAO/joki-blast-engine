@@ -187,7 +187,7 @@ Comprehensive QA, security audit, acceptance sign-off.
 ### Wave 2: REST API & Adapters
 
 - [x] 4. REST API Scaffold (auth, routes, middleware)
-- [ ] 5. WhatsApp Adapter (Cloud API + whatsapp-web.js)
+- [x] 5. WhatsApp Adapter (Cloud API + whatsapp-web.js)
 - [ ] 6. Telegram Adapter (Bot API + telegraf)
 - [ ] 7. Twitter/X Adapter (API v2 + twitter-api-v2)
 - [ ] 8. Threads Adapter (Official API + OAuth)
