@@ -189,8 +189,8 @@ Comprehensive QA, security audit, acceptance sign-off.
 - [x] 4. REST API Scaffold (auth, routes, middleware)
 - [x] 5. WhatsApp Adapter (Cloud API + whatsapp-web.js)
 - [x] 6. Telegram Adapter (Bot API + telegraf)
-- [ ] 7. Twitter/X Adapter (API v2 + twitter-api-v2)
-- [ ] 8. Threads Adapter (Official API + OAuth)
+- [x] 7. Twitter/X Adapter (API v2 + twitter-api-v2)
+- [x] 8. Threads Adapter (Official API + OAuth)
 - [ ] 9. Instagram Adapter (Graph API + private-api fallback)
 
 ### Wave 3: Job Queue & Rate Limiting

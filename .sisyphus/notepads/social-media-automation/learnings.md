@@ -1,12 +1,13 @@
-- Implemented a minimal REST API scaffold using Express with Zod-based validation and a centralized error handler.
-- Replaced Morgan-based logging with a Winston-based logger to satisfy requirement for structured request logging.
-- Health endpoint simplified to return {"status": "ok"} as per task spec.
-- Created route stubs for accounts, templates, posts, jobs, and adapters under src/routes/ with basic validation schemas.
-- Ensured config loading pattern: call loadConfig() before getConfig() and read port from API_PORT for server startup.
-- Next steps: integrate real business logic in route handlers as MVP expands and possibly add tests for validation paths.
-WhatsApp Adapter (Cloud API + whatsapp-web.js) implemented in this sprint.
-- Added IAdapter.ts to standardize adapter interfaces.
-- Implemented WhatsAppAdapter with dual-mode support (cloud-api and webjs) and a simple in-memory rate limiter.
-- Created a basic secrets.ts scaffold to hold tokens without committing real credentials.
-- Wrote unit tests (src/adapters/whatsapp.test.ts) with mocks to verify interface contracts, rate limiting, and basic send flow.
-- Next: wire tests to full integration, map real error responses, and avoid real API calls in CI by using mocks.
+# Twitter Adapter Implementation Learnings
+
+- Implemented a TwitterAdapter under src/adapters/twitter.ts that integrates with Twitter via the twitter-api-v2 library in a lazy manner to avoid runtime hard dependencies during tests.
+- Supports OAuth 1.0a and OAuth 2.0 (Bearer) by attempting to initialize readWrite client when credentials exist; falls back gracefully when libraries or credentials are not present.
+- postMessage creates a tweet; replyToMessage posts a reply to a given tweet id. Both methods include basic error mapping to standardized codes.
+- Implemented a simple in-memory rate-limiting placeholder to satisfy the engine's expectations and to be expanded later with real rate-limit data if needed.
+- Updated secrets.ts to require TWITTER_BEARER_TOKEN, TWITTER_API_KEY, TWITTER_API_SECRET and extended AppConfig to carry these values.
+Notes from implementing Threads Adapter:
+- Added ThreadsAdapter to src/adapters/threads.ts using Meta Threads Graph API pattern (publish, replies, status, accounts).
+- Enabled THREADS_ACCESS_TOKEN in config secrets and exposed via getConfig().
+- Wrote unit tests (src/adapters/threads.test.ts) with axios mocked to verify publishing, replying, status, and accounts flows.
+- Followed established adapter patterns from WhatsApp and Twitter adapters for consistency (connect, disconnect, rate-limit scaffolding).
+- Next: refine endpoints to reflect exact Meta Threads API surface and expand error mappings if meta exposes more detailed error codes.

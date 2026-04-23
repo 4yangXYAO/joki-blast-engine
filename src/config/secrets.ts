@@ -10,6 +10,11 @@ export const REQUIRED_VARS = [
   "LOG_LEVEL",
   "WHATSAPP_CLOUD_API_TOKEN",
   "TELEGRAM_BOT_TOKEN",
+  "THREADS_ACCESS_TOKEN",
+  // Twitter integration credentials
+  "TWITTER_BEARER_TOKEN",
+  "TWITTER_API_KEY",
+  "TWITTER_API_SECRET",
 ];
 
 // Load and validate configuration from environment
@@ -39,7 +44,11 @@ export type AppConfig = {
   LOG_LEVEL: string;
   WHATSAPP_CLOUD_API_TOKEN: string;
   TELEGRAM_BOT_TOKEN: string;
+  THREADS_ACCESS_TOKEN?: string;
   WHATSAPP_WEBJS_API_KEY?: string;
+  TWITTER_BEARER_TOKEN?: string;
+  TWITTER_API_KEY?: string;
+  TWITTER_API_SECRET?: string;
 };
 
 export function getConfig(): AppConfig {
@@ -55,8 +64,21 @@ export function getConfig(): AppConfig {
     WHATSAPP_CLOUD_API_TOKEN: cfg.WHATSAPP_CLOUD_API_TOKEN,
     TELEGRAM_BOT_TOKEN: cfg.TELEGRAM_BOT_TOKEN,
   } as AppConfig;
+  // Optional threads access token
+  if ((cfg as any).THREADS_ACCESS_TOKEN) {
+    (result as any).THREADS_ACCESS_TOKEN = (cfg as any).THREADS_ACCESS_TOKEN;
+  }
   if ((cfg as any).WHATSAPP_WEBJS_API_KEY) {
     result.WHATSAPP_WEBJS_API_KEY = (cfg as any).WHATSAPP_WEBJS_API_KEY;
+  }
+  if ((cfg as any).TWITTER_BEARER_TOKEN) {
+    result.TWITTER_BEARER_TOKEN = (cfg as any).TWITTER_BEARER_TOKEN;
+  }
+  if ((cfg as any).TWITTER_API_KEY) {
+    result.TWITTER_API_KEY = (cfg as any).TWITTER_API_KEY;
+  }
+  if ((cfg as any).TWITTER_API_SECRET) {
+    result.TWITTER_API_SECRET = (cfg as any).TWITTER_API_SECRET;
   }
   return result;
 }
