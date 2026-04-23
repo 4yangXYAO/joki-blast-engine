@@ -195,7 +195,7 @@ Comprehensive QA, security audit, acceptance sign-off.
 
 ### Wave 3: Job Queue & Rate Limiting
 
-- [ ] 10. Job Queue System (BullMQ setup & workers)
+- [x] 10. Job Queue System (BullMQ setup & workers)
 - [ ] 11. Retry Logic & Exponential Backoff
 - [ ] 12. Rate Limiter (per-platform handlers + circuit breakers)
 
