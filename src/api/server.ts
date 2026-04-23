@@ -8,6 +8,7 @@ import { templatesRouter } from '../routes/templates'
 import { postsRouter } from '../routes/posts'
 import { jobsRouter } from '../routes/jobs'
 import { adaptersRouter } from '../routes/adapters'
+import { webhooksRouter } from '../routes/webhooks'
 import type { Request, Response, NextFunction } from 'express'
 
 // Lightweight, centralized logger using Winston
@@ -61,6 +62,7 @@ export function startServer() {
   app.use('/v1/posts', postsRouter)
   app.use('/v1/jobs', jobsRouter)
   app.use('/v1/adapters', adaptersRouter)
+  app.use('/v1/webhooks', webhooksRouter)
 
   // Centralized error handling
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

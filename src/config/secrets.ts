@@ -9,6 +9,7 @@ export const REQUIRED_VARS = [
   "JWT_SECRET",
   "LOG_LEVEL",
   "WHATSAPP_CLOUD_API_TOKEN",
+  "TELEGRAM_BOT_TOKEN",
 ];
 
 // Load and validate configuration from environment
@@ -37,6 +38,7 @@ export type AppConfig = {
   JWT_SECRET: string;
   LOG_LEVEL: string;
   WHATSAPP_CLOUD_API_TOKEN: string;
+  TELEGRAM_BOT_TOKEN: string;
   WHATSAPP_WEBJS_API_KEY?: string;
 };
 
@@ -51,6 +53,7 @@ export function getConfig(): AppConfig {
     JWT_SECRET: cfg.JWT_SECRET,
     LOG_LEVEL: cfg.LOG_LEVEL,
     WHATSAPP_CLOUD_API_TOKEN: cfg.WHATSAPP_CLOUD_API_TOKEN,
+    TELEGRAM_BOT_TOKEN: cfg.TELEGRAM_BOT_TOKEN,
   } as AppConfig;
   if ((cfg as any).WHATSAPP_WEBJS_API_KEY) {
     result.WHATSAPP_WEBJS_API_KEY = (cfg as any).WHATSAPP_WEBJS_API_KEY;
