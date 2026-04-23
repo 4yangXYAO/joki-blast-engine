@@ -49,6 +49,10 @@ export type AppConfig = {
   TWITTER_BEARER_TOKEN?: string;
   TWITTER_API_KEY?: string;
   TWITTER_API_SECRET?: string;
+  // Instagram integration (optional)
+  INSTAGRAM_ACCESS_TOKEN?: string;
+  INSTAGRAM_ALLOW_PRIVATE_API?: string;
+  INSTAGRAM_BUSINESS_ACCOUNT_ID?: string;
 };
 
 export function getConfig(): AppConfig {
@@ -64,6 +68,21 @@ export function getConfig(): AppConfig {
     WHATSAPP_CLOUD_API_TOKEN: cfg.WHATSAPP_CLOUD_API_TOKEN,
     TELEGRAM_BOT_TOKEN: cfg.TELEGRAM_BOT_TOKEN,
   } as AppConfig;
+  // Optional Instagram fields (not strictly required to be present at startup)
+  // Allow overriding via environment variables if not provided by REQUIRED_VARS
+  const instagramAccess = (cfg as any).INSTAGRAM_ACCESS_TOKEN || (process.env as any).INSTAGRAM_ACCESS_TOKEN;
+  if (instagramAccess) {
+    (result as any).INSTAGRAM_ACCESS_TOKEN = instagramAccess;
+  }
+  const instagramAllow = (process.env as any).INSTAGRAM_ALLOW_PRIVATE_API;
+  if (instagramAllow !== undefined) {
+    (result as any).INSTAGRAM_ALLOW_PRIVATE_API = instagramAllow;
+  }
+  // Optional IG business account id (used by Graph API)
+  const igBizId = (cfg as any).INSTAGRAM_BUSINESS_ACCOUNT_ID || (process.env as any).INSTAGRAM_BUSINESS_ACCOUNT_ID;
+  if (igBizId) {
+    (result as any).INSTAGRAM_BUSINESS_ACCOUNT_ID = igBizId;
+  }
   // Optional threads access token
   if ((cfg as any).THREADS_ACCESS_TOKEN) {
     (result as any).THREADS_ACCESS_TOKEN = (cfg as any).THREADS_ACCESS_TOKEN;

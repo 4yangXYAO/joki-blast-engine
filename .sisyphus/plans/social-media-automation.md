@@ -191,7 +191,7 @@ Comprehensive QA, security audit, acceptance sign-off.
 - [x] 6. Telegram Adapter (Bot API + telegraf)
 - [x] 7. Twitter/X Adapter (API v2 + twitter-api-v2)
 - [x] 8. Threads Adapter (Official API + OAuth)
-- [ ] 9. Instagram Adapter (Graph API + private-api fallback)
+- [x] 9. Instagram Adapter (Graph API + private-api fallback)
 
 ### Wave 3: Job Queue & Rate Limiting
 
