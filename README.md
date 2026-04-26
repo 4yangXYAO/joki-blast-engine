@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # joki-blast-engine
 
 This repository is a minimal Node.js/TypeScript project for a small engine. It includes a lightweight environment configuration system and a validator to ensure required environment variables are present before running.
@@ -216,3 +217,6 @@ Replace `instagram-cookie` with `twitter-cookie` or `threads-cookie` as needed.
 
 > **Note:** Cookie-based adapters call internal platform endpoints. These are not official APIs.
 > Ensure you comply with each platform's Terms of Service.
+=======
+# Blast-Service-share
+>>>>>>> 820c59943a240a463a2b9ba8ff8d8854e68b4c30
