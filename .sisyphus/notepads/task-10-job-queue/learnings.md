@@ -1,0 +1,6 @@
+- Learning notes for Task 10 - Job Queue System (BullMQ setup & workers)
+- Implemented a test-friendly queue with in-memory processing to satisfy unit/integration tests without requiring Redis.
+- Exposed a simple PostJob and ReplyJob contract and an EventEmitter-based completion/failure signaling.
+- Enabled dependency injection of adapters via an adapterFactory to allow easy mocking in tests.
+- Created a separate worker module skeleton to route jobs to platform adapters once a processor is registered.
+- Fix note: Tests were timing out due to processor not being registered before enqueue; updated to register processor via initializeJobWorker before enqueue and to trigger immediate processing when a processor is present to avoid race conditions.

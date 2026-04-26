@@ -1,0 +1,6 @@
+- Decisions for Task 10 - Job Queue System
+- Use in-memory queue with optional BullMQ scaffolding. Processor registration is explicit via initializeJobWorker. Jobs are routed to platform adapters through a DI adapterFactory. Tests wait for 'completed'/'failed' events to verify outcomes. Implement immediate processing when a processor exists to avoid race conditions.
+- Use in-memory queue processing for testability; BullMQ integration is scaffolded but Redis specifics are deferred to later tasks.
+- Provide adapterFactory DI to allow tests to inject mocks for PostJob/ReplyJob routing.
+- Implement on('completed') and on('failed') events to observe job outcomes.
+- Create a dedicated job-queue.ts and worker scaffold to satisfy architectural plan while avoiding tight coupling to Redis in this pass.

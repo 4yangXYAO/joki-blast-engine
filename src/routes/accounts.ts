@@ -1,28 +1,90 @@
-import { Router, Request, Response } from 'express'
-import { z } from 'zod'
+import { Router } from "express";
+import { encrypt, sha256Hex } from "../utils/crypto";
+import { getDb } from "../db/sqlite";
+import { AccountsRepo, Account } from "../repos/accountsRepo";
 
-export const accountsRouter = Router()
+const router = Router();
 
-// Simple schema for account creation (stub)
-const createAccountSchema = z.object({
-  username: z.string().min(3),
-  password: z.string().min(6),
-})
+// Do NOT init DB at module import time. Tests should initialize the DB via
+// vitest.setup or the server entrypoint. Provide a factory to obtain a repo
+// instance lazily so importing this route doesn't force DB init.
+let accountsRepo: AccountsRepo | null = null;
+export function getAccountsRepo(db?: any) {
+  if (accountsRepo) return accountsRepo;
+  accountsRepo = new AccountsRepo(db);
+  return accountsRepo;
+}
 
-accountsRouter.get('/', (_req: Request, res: Response) => {
-  res.json({ message: 'Accounts (stub) route' })
-})
+/**
+ * @route   GET /v1/accounts
+ */
+router.get("/", async (req, res) => {
+  const repo = getAccountsRepo();
+  const rows = repo.list();
+  const out = rows.map((acc: any) => ({
+    id: acc.id,
+    platform: acc.platform,
+    username: acc.username ?? acc.display_name,
+    status: acc.status ?? "active",
+    created_at: acc.created_at
+  }));
+  res.json(out);
+});
 
-accountsRouter.post('/', (req: Request, res: Response) => {
-  try {
-    const data = createAccountSchema.parse(req.body)
-    // Stub: pretend we created an account
-    res.status(201).json({ message: 'Account stub created', data })
-  } catch (e) {
-    if (e instanceof z.ZodError) {
-      res.status(400).json({ error: 'Validation failed', details: e.errors })
-    } else {
-      res.status(500).json({ error: 'Internal Server Error' })
-    }
+/**
+ * @route   POST /v1/accounts
+ */
+router.post("/", async (req, res) => {
+  const { platform, username, email, credentials } = req.body;
+
+  if (!platform || !username || !credentials) {
+    return res.status(400).json({ error: "Missing required fields" });
   }
-})
+
+  const encryptedValue = encrypt(credentials);
+  const credentials_hash = sha256Hex(credentials);
+
+  const repo = getAccountsRepo();
+  const created = repo.create({
+    platform,
+    display_name: username,
+    credentials_encrypted: encryptedValue
+  });
+
+  res.status(201).json({ id: created.id, message: "Account created successfully" });
+});
+
+/**
+ * @route   PUT /v1/accounts/:id
+ */
+router.put("/:id", async (req, res) => {
+  const { id } = req.params;
+  const repo = getAccountsRepo();
+  const existing = repo.findById(id);
+  if (!existing) return res.status(404).json({ error: "Account not found" });
+
+  // Simple update: allow updating display_name and credentials (encrypted externally)
+  const updated = { ...existing, ...req.body, updated_at: new Date().toISOString() };
+  // For simplicity, perform delete+insert via repo API (small dataset). Better: implement update method.
+  repo.delete(id);
+  // Re-create with same id
+  const db = repo.db ?? getDb();
+  db.prepare(
+    `INSERT INTO accounts (id, platform, display_name, credentials_encrypted) VALUES (?, ?, ?, ?)`
+  ).run(id, updated.platform ?? existing.platform, updated.display_name ?? existing.display_name, updated.credentials_encrypted ?? existing.credentials_encrypted);
+
+  res.json({ message: "Account updated" });
+});
+
+/**
+ * @route   DELETE /v1/accounts/:id
+ */
+router.delete("/:id", async (req, res) => {
+  const { id } = req.params;
+  const ok = accountsRepo.delete(id);
+  if (!ok) return res.status(404).json({ error: "Account not found" });
+  res.json({ message: "Account deleted" });
+});
+
+export const accountsRouter = router;
+export default router;

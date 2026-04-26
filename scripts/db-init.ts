@@ -1,9 +1,8 @@
 #!/usr/bin/env ts-node
 import path from 'path';
 import fs from 'fs';
-import Database from 'better-sqlite3';
 
-// Initialize SQLite database with WAL mode and run migrations
+// Initialize database using src/db/sqlite.ts which supports better-sqlite3 or sql.js fallback
 const ROOT = path.resolve(__dirname, '..');
 const DATA_DIR = path.resolve(ROOT, 'data');
 const DB_PATH = path.resolve(DATA_DIR, 'app.db');
@@ -17,32 +16,38 @@ function ensureDir(dir: string) {
 
 async function main() {
   ensureDir(DATA_DIR);
-  // Open or create DB
-  const db = new (Database as any)(DB_PATH);
-  // Enable WAL mode for better concurrency
-  db.pragma('journal_mode = WAL');
+  // Import DB helper (TypeScript via ts-node)
+  const dbModule = require('../src/db/sqlite.ts');
 
-  // Apply all migrations in order
-  if (fs.existsSync(MIGRATIONS_DIR)) {
-    const files = fs.readdirSync(MIGRATIONS_DIR)
-      .filter((f) => f.endsWith('.sql'))
-      .sort();
-    for (const file of files) {
-      const full = path.resolve(MIGRATIONS_DIR, file);
-      const sql = fs.readFileSync(full, 'utf8');
-      try {
-        db.exec(sql);
-        console.log(`Applied migration: ${file}`);
-      } catch (err) {
-        console.error(`Failed to apply migration ${file}:`, err);
-        throw err;
-      }
-    }
-  } else {
-    console.warn('Migrations directory not found, skipping migrations.');
+  let db: any;
+  try {
+    // Try native init first
+    db = dbModule.initDatabase(DB_PATH);
+    console.log('Initialized native better-sqlite3 database at', DB_PATH);
+  } catch (err: any) {
+    console.warn('Native better-sqlite3 not available, falling back to sql.js:', err && err.message);
+    db = await dbModule.initSqlJsDatabase(DB_PATH);
+    console.log('Initialized sql.js database at', DB_PATH);
   }
 
-  db.close();
+  // Run migrations
+  try {
+    dbModule.runMigrations(MIGRATIONS_DIR);
+  } catch (err) {
+    console.error('Failed running migrations:', err);
+    try {
+      if (dbModule.closeDatabase) dbModule.closeDatabase();
+    } catch {}
+    throw err;
+  }
+
+  // Close DB (sql.js persists to file in close)
+  try {
+    if (dbModule.closeDatabase) dbModule.closeDatabase();
+  } catch (err) {
+    console.warn('Error closing DB:', err);
+  }
+
   console.log('DB initialization complete.');
 }
 

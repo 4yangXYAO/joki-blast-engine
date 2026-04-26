@@ -10,6 +10,7 @@ describe("WhatsAppAdapter", () => {
     process.env.DASHBOARD_PORT = "4000";
     process.env.JWT_SECRET = "secret";
     process.env.LOG_LEVEL = "info";
+    // Keep legacy token so connect() guard passes; WAHA_BASE_URL not set → mock path active
     process.env.WHATSAPP_CLOUD_API_TOKEN = "test-token";
   });
 

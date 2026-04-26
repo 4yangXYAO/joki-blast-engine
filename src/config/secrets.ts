@@ -1,6 +1,9 @@
 // Centralized config loader with validation (restored from previous plan)
 
 // Required environment variables for this service
+// Core required environment variables. Platform-specific tokens are optional and
+// should be provided per-account (via POST /v1/accounts) or set in .env when
+// needed for integration tests / production.
 export const REQUIRED_VARS = [
   "DATABASE_PATH",
   "API_PORT",
@@ -8,14 +11,32 @@ export const REQUIRED_VARS = [
   "DASHBOARD_PORT",
   "JWT_SECRET",
   "LOG_LEVEL",
-  "WHATSAPP_CLOUD_API_TOKEN",
-  "TELEGRAM_BOT_TOKEN",
-  "THREADS_ACCESS_TOKEN",
-  // Twitter integration credentials
-  "TWITTER_BEARER_TOKEN",
-  "TWITTER_API_KEY",
-  "TWITTER_API_SECRET",
 ];
+
+function readRuntimeSettingValue(key: string): string | undefined {
+  const envValue = (process.env as any)[key];
+  if (envValue) return envValue;
+
+  try {
+    const crypto = require("crypto");
+    const { getDb } = require("../db/sqlite");
+    const db = getDb();
+    const row = db.prepare("SELECT value_encrypted FROM runtime_settings WHERE key = ? LIMIT 1").get(key);
+    if (!row?.value_encrypted) return undefined;
+
+    const secret = process.env.JWT_SECRET || "fallback-secret-for-development-only";
+    const keyBytes = crypto.createHash("sha256").update(secret).digest();
+    const data = Buffer.from(row.value_encrypted, "base64");
+    const iv = data.slice(0, 12);
+    const tag = data.slice(12, 28);
+    const ciphertext = data.slice(28);
+    const decipher = crypto.createDecipheriv("aes-256-gcm", keyBytes, iv);
+    decipher.setAuthTag(tag);
+    return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8");
+  } catch {
+    return undefined;
+  }
+}
 
 // Load and validate configuration from environment
 export function loadConfig(): { [key: string]: string } {
@@ -53,6 +74,14 @@ export type AppConfig = {
   INSTAGRAM_ACCESS_TOKEN?: string;
   INSTAGRAM_ALLOW_PRIVATE_API?: string;
   INSTAGRAM_BUSINESS_ACCOUNT_ID?: string;
+  // Waha (self-hosted WhatsApp HTTP API)
+  WAHA_BASE_URL?: string;
+  WAHA_API_KEY?: string;
+  WAHA_SESSION?: string;
+  // Telegram MTProto (gramjs / Telethon-style user account)
+  TELEGRAM_API_ID?: string;
+  TELEGRAM_API_HASH?: string;
+  TELEGRAM_SESSION?: string;
 };
 
 export function getConfig(): AppConfig {
@@ -65,39 +94,59 @@ export function getConfig(): AppConfig {
     DASHBOARD_PORT: cfg.DASHBOARD_PORT,
     JWT_SECRET: cfg.JWT_SECRET,
     LOG_LEVEL: cfg.LOG_LEVEL,
-    WHATSAPP_CLOUD_API_TOKEN: cfg.WHATSAPP_CLOUD_API_TOKEN,
-    TELEGRAM_BOT_TOKEN: cfg.TELEGRAM_BOT_TOKEN,
+    // Optional platform tokens can come from env first, then runtime settings stored in SQLite
+    WHATSAPP_CLOUD_API_TOKEN: readRuntimeSettingValue("WHATSAPP_CLOUD_API_TOKEN") || '',
+    TELEGRAM_BOT_TOKEN: readRuntimeSettingValue("TELEGRAM_BOT_TOKEN") || '',
   } as AppConfig;
   // Optional Instagram fields (not strictly required to be present at startup)
   // Allow overriding via environment variables if not provided by REQUIRED_VARS
-  const instagramAccess = (cfg as any).INSTAGRAM_ACCESS_TOKEN || (process.env as any).INSTAGRAM_ACCESS_TOKEN;
+  const instagramAccess = readRuntimeSettingValue("INSTAGRAM_ACCESS_TOKEN") || (cfg as any).INSTAGRAM_ACCESS_TOKEN || (process.env as any).INSTAGRAM_ACCESS_TOKEN;
   if (instagramAccess) {
     (result as any).INSTAGRAM_ACCESS_TOKEN = instagramAccess;
   }
-  const instagramAllow = (process.env as any).INSTAGRAM_ALLOW_PRIVATE_API;
+  const instagramAllow = readRuntimeSettingValue("INSTAGRAM_ALLOW_PRIVATE_API") || (process.env as any).INSTAGRAM_ALLOW_PRIVATE_API;
   if (instagramAllow !== undefined) {
     (result as any).INSTAGRAM_ALLOW_PRIVATE_API = instagramAllow;
   }
   // Optional IG business account id (used by Graph API)
-  const igBizId = (cfg as any).INSTAGRAM_BUSINESS_ACCOUNT_ID || (process.env as any).INSTAGRAM_BUSINESS_ACCOUNT_ID;
+  const igBizId = readRuntimeSettingValue("INSTAGRAM_BUSINESS_ACCOUNT_ID") || (cfg as any).INSTAGRAM_BUSINESS_ACCOUNT_ID || (process.env as any).INSTAGRAM_BUSINESS_ACCOUNT_ID;
   if (igBizId) {
     (result as any).INSTAGRAM_BUSINESS_ACCOUNT_ID = igBizId;
   }
-  // Optional threads access token
-  if ((cfg as any).THREADS_ACCESS_TOKEN) {
-    (result as any).THREADS_ACCESS_TOKEN = (cfg as any).THREADS_ACCESS_TOKEN;
+  // Optional platform tokens read from process.env (do not require at startup)
+  const threadsToken = readRuntimeSettingValue("THREADS_ACCESS_TOKEN");
+  if (threadsToken) {
+    (result as any).THREADS_ACCESS_TOKEN = threadsToken;
   }
-  if ((cfg as any).WHATSAPP_WEBJS_API_KEY) {
-    result.WHATSAPP_WEBJS_API_KEY = (cfg as any).WHATSAPP_WEBJS_API_KEY;
+  const webjsApiKey = readRuntimeSettingValue("WHATSAPP_WEBJS_API_KEY");
+  if (webjsApiKey) {
+    result.WHATSAPP_WEBJS_API_KEY = webjsApiKey;
   }
-  if ((cfg as any).TWITTER_BEARER_TOKEN) {
-    result.TWITTER_BEARER_TOKEN = (cfg as any).TWITTER_BEARER_TOKEN;
+  const twitterBearer = readRuntimeSettingValue("TWITTER_BEARER_TOKEN");
+  if (twitterBearer) {
+    result.TWITTER_BEARER_TOKEN = twitterBearer;
   }
-  if ((cfg as any).TWITTER_API_KEY) {
-    result.TWITTER_API_KEY = (cfg as any).TWITTER_API_KEY;
+  const twitterApiKey = readRuntimeSettingValue("TWITTER_API_KEY");
+  if (twitterApiKey) {
+    result.TWITTER_API_KEY = twitterApiKey;
   }
-  if ((cfg as any).TWITTER_API_SECRET) {
-    result.TWITTER_API_SECRET = (cfg as any).TWITTER_API_SECRET;
+  const twitterApiSecret = readRuntimeSettingValue("TWITTER_API_SECRET");
+  if (twitterApiSecret) {
+    result.TWITTER_API_SECRET = twitterApiSecret;
   }
+  // Waha optional fields
+  const wahaBaseUrl = readRuntimeSettingValue("WAHA_BASE_URL") || (process.env as any).WAHA_BASE_URL;
+  if (wahaBaseUrl) result.WAHA_BASE_URL = wahaBaseUrl;
+  const wahaApiKey = readRuntimeSettingValue("WAHA_API_KEY") || (process.env as any).WAHA_API_KEY;
+  if (wahaApiKey) result.WAHA_API_KEY = wahaApiKey;
+  const wahaSession = readRuntimeSettingValue("WAHA_SESSION") || (process.env as any).WAHA_SESSION;
+  if (wahaSession) result.WAHA_SESSION = wahaSession;
+  // Telegram MTProto optional fields
+  const tgApiId = readRuntimeSettingValue("TELEGRAM_API_ID") || (process.env as any).TELEGRAM_API_ID;
+  if (tgApiId) result.TELEGRAM_API_ID = tgApiId;
+  const tgApiHash = readRuntimeSettingValue("TELEGRAM_API_HASH") || (process.env as any).TELEGRAM_API_HASH;
+  if (tgApiHash) result.TELEGRAM_API_HASH = tgApiHash;
+  const tgSession = readRuntimeSettingValue("TELEGRAM_SESSION") || (process.env as any).TELEGRAM_SESSION;
+  if (tgSession) result.TELEGRAM_SESSION = tgSession;
   return result;
 }

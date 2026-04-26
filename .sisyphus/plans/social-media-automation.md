@@ -194,17 +194,17 @@ Comprehensive QA, security audit, acceptance sign-off.
 - [x] 9. Instagram Adapter (Graph API + private-api fallback)
 
 ### Wave 3: Job Queue & Rate Limiting
-
-- [x] 10. Job Queue System (BullMQ setup & workers)
-- [ ] 11. Retry Logic & Exponential Backoff
-- [ ] 12. Rate Limiter (per-platform handlers + circuit breakers)
+ 
+ - [x] 10. Job Queue System (BullMQ setup & workers)
+ - [x] 11. Retry Logic & Exponential Backoff
+ - [x] 12. Rate Limiter (per-platform handlers + circuit breakers)
 
 ### Wave 4: Dashboard & Features
-
-- [ ] 13. Account Management API Endpoints
-- [ ] 14. Template Management (CRUD + CSV import)
-- [ ] 15. Job Scheduling & Manual Trigger Endpoints
-- [ ] 16. Next.js Admin Dashboard (UI scaffolding)
+ 
+ - [x] 13. Account Management API Endpoints
+ - [x] 14. Template Management (CRUD + CSV import)
+ - [ ] 15. Job Scheduling & Manual Trigger Endpoints
+- [x] 16. Next.js Admin Dashboard (UI scaffolding)
 - [ ] 17. Dashboard Features (accounts, templates, scheduling, monitoring)
 - [ ] 18. Analytics Queries & Dashboard Widgets
 
@@ -1858,4 +1858,3 @@ type(scope): short description
 | Cookies expired (WhatsApp Web) | Token refresh logic; monitor session health; fallback to Cloud API |
 | Rate limit exceeded | Per-platform rate limiter; exponential backoff + jitter; circuit breaker |
 | Secret leak | Encrypted storage; no logs with credentials; audit log for access |
-

@@ -52,10 +52,10 @@ export class WhatsAppAdapter implements IAdapter {
     } else {
       // Cloud API path: ensure token via getConfig
       const cfg = getConfig();
-      if (!cfg.WHATSAPP_CLOUD_API_TOKEN) {
-        throw new Error("WhatsApp Cloud API token not configured");
+      if (!cfg.WHATSAPP_CLOUD_API_TOKEN && !cfg.WAHA_BASE_URL) {
+        throw new Error("WhatsApp Cloud API token or WAHA_BASE_URL not configured");
       }
-      this.log("Connected via Cloud API (mocked in tests)");
+      this.log("Connected via Cloud API");
     }
   }
 
@@ -87,14 +87,32 @@ export class WhatsAppAdapter implements IAdapter {
         this.log(`Mock send via webjs to ${to}: ${message.substring(0, 40)}`);
         return { success: true };
       } else {
-        // Cloud API path (mocked) - retrieve config for token
         const cfg = getConfig();
-        const token = cfg.WHATSAPP_CLOUD_API_TOKEN;
-        if (!token) throw new Error("Missing token");
-        // Simulate API call
-        this.log(`Mock send via Cloud API to ${to}: ${message.substring(0, 40)}`);
-        // In tests, this should be mocked to verify error mapping
-        return { success: true };
+        if (cfg.WAHA_BASE_URL) {
+          const url = `${cfg.WAHA_BASE_URL}/api/sendText`;
+          const response = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-WAHA-API-KEY": cfg.WAHA_API_KEY || "",
+            },
+            body: JSON.stringify({
+              session: cfg.WAHA_SESSION || "default",
+              chatId: to,
+              text: message,
+            }),
+          });
+          if (!response.ok) {
+            throw new Error(`WAHA API error: ${response.statusText}`);
+          }
+          return { success: true };
+        } else {
+          // Fallback to legacy mock
+          const token = cfg.WHATSAPP_CLOUD_API_TOKEN;
+          if (!token) throw new Error("Missing token");
+          this.log(`Mock send via Cloud API to ${to}: ${message.substring(0, 40)}`);
+          return { success: true };
+        }
       }
     } catch (err: any) {
       const code = "WHATSAPP_SEND_ERROR";

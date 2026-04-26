@@ -34,7 +34,9 @@ describe('JobQueue (in-memory path)', () => {
     const adapterMap: any = {
       whatsapp: {
         replyToMessage: async (_chatId: string, _messageId: string, _text: string) => {
-          throw new Error('simulated-failure');
+          const err: any = new Error('simulated-failure');
+          err.response = { status: 401 };
+          throw err;
         },
       },
     };
