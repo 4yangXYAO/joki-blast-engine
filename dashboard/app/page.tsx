@@ -1,76 +1,347 @@
-"use client";
+'use client'
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from 'react'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://127.0.0.1:3456";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? 'http://127.0.0.1:3000'
 
 const INTEGRATION_FIELDS = [
-  { key: "WHATSAPP_CLOUD_API_TOKEN", label: "WhatsApp Cloud API Token", placeholder: "EAA..." },
-  { key: "TELEGRAM_BOT_TOKEN", label: "Telegram Bot Token", placeholder: "123456:ABC..." },
-  { key: "THREADS_ACCESS_TOKEN", label: "Threads Access Token", placeholder: "threads token" },
-  { key: "TWITTER_BEARER_TOKEN", label: "Twitter Bearer Token", placeholder: "twitter bearer token" },
-  { key: "TWITTER_API_KEY", label: "Twitter API Key", placeholder: "twitter api key" },
-  { key: "TWITTER_API_SECRET", label: "Twitter API Secret", placeholder: "twitter api secret" },
-  { key: "INSTAGRAM_ACCESS_TOKEN", label: "Instagram Access Token", placeholder: "instagram token" },
-  { key: "INSTAGRAM_BUSINESS_ACCOUNT_ID", label: "Instagram Business Account ID", placeholder: "instagram business id" },
-  { key: "INSTAGRAM_ALLOW_PRIVATE_API", label: "Instagram Allow Private API", placeholder: "true or false" },
-  { key: "WHATSAPP_WEBJS_API_KEY", label: "WhatsApp WebJS API Key", placeholder: "optional" },
-] as const;
+  { key: 'WHATSAPP_CLOUD_API_TOKEN', label: 'WhatsApp Cloud API Token', placeholder: 'EAA...' },
+  { key: 'TELEGRAM_BOT_TOKEN', label: 'Telegram Bot Token', placeholder: '123456:ABC...' },
+  { key: 'THREADS_ACCESS_TOKEN', label: 'Threads Access Token', placeholder: 'threads token' },
+  {
+    key: 'TWITTER_BEARER_TOKEN',
+    label: 'Twitter Bearer Token',
+    placeholder: 'twitter bearer token',
+  },
+  { key: 'TWITTER_API_KEY', label: 'Twitter API Key', placeholder: 'twitter api key' },
+  { key: 'TWITTER_API_SECRET', label: 'Twitter API Secret', placeholder: 'twitter api secret' },
+  {
+    key: 'INSTAGRAM_ACCESS_TOKEN',
+    label: 'Instagram Access Token',
+    placeholder: 'instagram token',
+  },
+  {
+    key: 'INSTAGRAM_BUSINESS_ACCOUNT_ID',
+    label: 'Instagram Business Account ID',
+    placeholder: 'instagram business id',
+  },
+  {
+    key: 'INSTAGRAM_ALLOW_PRIVATE_API',
+    label: 'Instagram Allow Private API',
+    placeholder: 'true or false',
+  },
+  { key: 'WHATSAPP_WEBJS_API_KEY', label: 'WhatsApp WebJS API Key', placeholder: 'optional' },
+] as const
 
-type FieldKey = (typeof INTEGRATION_FIELDS)[number]["key"];
-type ConfiguredMap = Partial<Record<FieldKey, boolean>>;
+type FieldKey = (typeof INTEGRATION_FIELDS)[number]['key']
+type ConfiguredMap = Partial<Record<FieldKey, boolean>>
+
+type AccountFormState = {
+  platform: string
+  username: string
+  credentials: string
+}
+
+type TemplateFormState = {
+  name: string
+  content: string
+  variables: string
+  type: string
+}
+
+type JobFormState = {
+  cron: string
+  templateId: string
+  accountId: string
+  recipient: string
+  platform: string
+  message: string
+}
+
+type CampaignFormState = {
+  name: string
+  content: string
+  cta_link: string
+  platforms: string[] // Array of selected platforms
+}
 
 function makeEmptyForm() {
-  return INTEGRATION_FIELDS.reduce((acc, field) => {
-    acc[field.key] = "";
-    return acc;
-  }, {} as Record<FieldKey, string>);
+  return INTEGRATION_FIELDS.reduce(
+    (acc, field) => {
+      acc[field.key] = ''
+      return acc
+    },
+    {} as Record<FieldKey, string>
+  )
 }
 
 export default function Page() {
-  const [health, setHealth] = useState<{ status?: string }>({ status: "loading" });
-  const [configured, setConfigured] = useState<ConfiguredMap>({});
-  const [form, setForm] = useState<Record<FieldKey, string>>(makeEmptyForm());
-  const [message, setMessage] = useState("");
+  const [health, setHealth] = useState<{ status?: string }>({ status: 'loading' })
+  const [configured, setConfigured] = useState<ConfiguredMap>({})
+  const [form, setForm] = useState<Record<FieldKey, string>>(makeEmptyForm())
+  const [message, setMessage] = useState('')
+  const [accountForm, setAccountForm] = useState<AccountFormState>({
+    platform: 'whatsapp',
+    username: 'test_account',
+    credentials: 'secret-token',
+  })
+  const [templateForm, setTemplateForm] = useState<TemplateFormState>({
+    name: 'Promo',
+    content: 'Check this out {link}',
+    variables: 'link',
+    type: 'template',
+  })
+  const [jobForm, setJobForm] = useState<JobFormState>({
+    cron: '* * * * *',
+    templateId: '',
+    accountId: '',
+    recipient: '',
+    platform: 'whatsapp',
+    message: 'Halo dari dashboard',
+  })
+  const [createdAccountId, setCreatedAccountId] = useState<string>('')
+  const [createdTemplateId, setCreatedTemplateId] = useState<string>('')
+  const [actionState, setActionState] = useState<string>('')
+  const [accounts, setAccounts] = useState<
+    Array<{ id: string; platform: string; username?: string; status?: string }>
+  >([])
+  const [templates, setTemplates] = useState<Array<{ id: string; name: string; type: string }>>([])
+  const [campaignForm, setCampaignForm] = useState<CampaignFormState>({
+    name: 'Summer Sale',
+    content: 'Check out our summer sale! Limited time offer.',
+    cta_link: 'https://wa.me/62812345678',
+    platforms: ['twitter', 'threads'],
+  })
+  const [campaigns, setCampaigns] = useState<Array<{ id: string; name: string; status: string }>>(
+    []
+  )
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>('')
 
   useEffect(() => {
     const load = async () => {
       try {
         const [healthResponse, settingsResponse] = await Promise.all([
-          fetch(`${API_BASE}/v1/health`, { cache: "no-store" }).then((res) => res.json()),
-          fetch(`${API_BASE}/v1/settings/integrations`, { cache: "no-store" }).then((res) => res.json()),
-        ]);
-        setHealth(healthResponse);
-        setConfigured(settingsResponse?.configured ?? {});
+          fetch(`${API_BASE}/v1/health`, { cache: 'no-store' }).then((res) => res.json()),
+          fetch(`${API_BASE}/v1/settings/integrations`, { cache: 'no-store' }).then((res) =>
+            res.json()
+          ),
+        ])
+        setHealth(healthResponse)
+        setConfigured(settingsResponse?.configured ?? {})
+        await refreshCollections()
       } catch {
-        setHealth({ status: "offline" });
+        setHealth({ status: 'offline' })
       }
-    };
+    }
 
-    void load();
-  }, []);
+    void load()
+  }, [])
 
-  const configuredCount = useMemo(() => Object.values(configured).filter(Boolean).length, [configured]);
+  async function refreshCollections() {
+    try {
+      const [accountsResponse, templatesResponse, campaignsResponse] = await Promise.all([
+        fetch(`${API_BASE}/v1/accounts`, { cache: 'no-store' }).then((res) => res.json()),
+        fetch(`${API_BASE}/v1/templates`, { cache: 'no-store' }).then((res) => res.json()),
+        fetch(`${API_BASE}/v1/campaigns`, { cache: 'no-store' }).then((res) => res.json()),
+      ])
+      setAccounts(Array.isArray(accountsResponse) ? accountsResponse : [])
+      setTemplates(Array.isArray(templatesResponse) ? templatesResponse : [])
+      setCampaigns(Array.isArray(campaignsResponse) ? campaignsResponse : [])
+      if (!createdAccountId && Array.isArray(accountsResponse) && accountsResponse.length > 0) {
+        setCreatedAccountId(accountsResponse[0].id)
+      }
+      if (!createdTemplateId && Array.isArray(templatesResponse) && templatesResponse.length > 0) {
+        setCreatedTemplateId(templatesResponse[0].id)
+      }
+      if (!selectedCampaignId && Array.isArray(campaignsResponse) && campaignsResponse.length > 0) {
+        setSelectedCampaignId(campaignsResponse[0].id)
+      }
+    } catch {
+      setAccounts([])
+      setTemplates([])
+      setCampaigns([])
+    }
+  }
+
+  const configuredCount = useMemo(
+    () => Object.values(configured).filter(Boolean).length,
+    [configured]
+  )
 
   async function saveTokens() {
-    setMessage("Saving...");
-    const payload = Object.fromEntries(Object.entries(form).filter(([, value]) => value.trim().length > 0));
+    setMessage('Saving...')
+    const payload = Object.fromEntries(
+      Object.entries(form).filter(([, value]) => value.trim().length > 0)
+    )
 
     try {
       const response = await fetch(`${API_BASE}/v1/settings/integrations`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-      });
+      })
       if (!response.ok) {
-        throw new Error("Failed to save tokens");
+        throw new Error('Failed to save tokens')
       }
-      const data = await response.json();
-      setConfigured(data.configured ?? {});
-      setForm(makeEmptyForm());
-      setMessage("Saved. You can now use the platform adapters without restarting.");
+      const data = await response.json()
+      setConfigured(data.configured ?? {})
+      setForm(makeEmptyForm())
+      setMessage('Saved. You can now use the platform adapters without restarting.')
     } catch (error: any) {
-      setMessage(error?.message ?? "Failed to save tokens");
+      setMessage(error?.message ?? 'Failed to save tokens')
+    }
+  }
+
+  async function createAccount() {
+    setActionState('Creating account...')
+    try {
+      const response = await fetch(`${API_BASE}/v1/accounts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(accountForm),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.error ?? 'Failed to create account')
+      }
+      setCreatedAccountId(data.id)
+      setJobForm((current) => ({ ...current, accountId: data.id, platform: accountForm.platform }))
+      setActionState(`Account created: ${data.id}`)
+      await refreshCollections()
+    } catch (error: any) {
+      setActionState(error?.message ?? 'Failed to create account')
+    }
+  }
+
+  async function createTemplate() {
+    setActionState('Creating template...')
+    try {
+      const variables = templateForm.variables
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean)
+      const response = await fetch(`${API_BASE}/v1/templates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: templateForm.name,
+          content: templateForm.content,
+          variables,
+          type: templateForm.type,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.error ?? 'Failed to create template')
+      }
+      setCreatedTemplateId(data.id)
+      setJobForm((current) => ({ ...current, templateId: data.id }))
+      setActionState(`Template created: ${data.id}`)
+      await refreshCollections()
+    } catch (error: any) {
+      setActionState(error?.message ?? 'Failed to create template')
+    }
+  }
+
+  async function scheduleJob() {
+    setActionState('Scheduling job...')
+    try {
+      const response = await fetch(`${API_BASE}/v1/jobs/schedule`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cron: jobForm.cron,
+          template_id: jobForm.templateId || createdTemplateId,
+          account_id: jobForm.accountId || createdAccountId,
+          to: jobForm.recipient,
+          platform: jobForm.platform,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.error ?? 'Failed to schedule job')
+      }
+      setActionState(`Job scheduled: ${data.id ?? data.cron ?? 'ok'}`)
+    } catch (error: any) {
+      setActionState(error?.message ?? 'Failed to schedule job')
+    }
+  }
+
+  async function blastNow() {
+    setActionState('Triggering blast...')
+    try {
+      const response = await fetch(`${API_BASE}/v1/jobs/trigger`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          template_id: jobForm.templateId || createdTemplateId,
+          account_id: jobForm.accountId || createdAccountId,
+          to: jobForm.recipient,
+          platform: jobForm.platform,
+          message: jobForm.message,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.error ?? 'Failed to trigger blast')
+      }
+      setActionState(`Blast triggered: ${data.job_id}`)
+    } catch (error: any) {
+      setActionState(error?.message ?? 'Failed to trigger blast')
+    }
+  }
+
+  async function createCampaign() {
+    setActionState('Creating campaign...')
+    try {
+      const response = await fetch(`${API_BASE}/v1/campaigns`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: campaignForm.name,
+          content: campaignForm.content,
+          cta_link: campaignForm.cta_link,
+          platforms: campaignForm.platforms,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.error ?? 'Failed to create campaign')
+      }
+      setSelectedCampaignId(data.id)
+      setActionState(`Campaign created: ${data.id}`)
+      await refreshCollections()
+    } catch (error: any) {
+      setActionState(error?.message ?? 'Failed to create campaign')
+    }
+  }
+
+  async function blastCampaign() {
+    setActionState('Blasting campaign...')
+    try {
+      if (!selectedCampaignId) {
+        throw new Error('No campaign selected')
+      }
+      const response = await fetch(`${API_BASE}/v1/campaigns/${selectedCampaignId}/blast`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          account_ids: {
+            twitter: createdAccountId,
+            threads: createdAccountId,
+            instagram: createdAccountId,
+            facebook: createdAccountId,
+          },
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.error ?? 'Failed to blast campaign')
+      }
+      setActionState(`Campaign blasted: ${data.campaign_id ?? 'ok'}`)
+      await refreshCollections()
+    } catch (error: any) {
+      setActionState(error?.message ?? 'Failed to blast campaign')
     }
   }
 
@@ -82,39 +353,61 @@ export default function Page() {
       <div className="grid">
         <section className="card">
           <h2>API Health</h2>
-          <p>Status: <strong>{health.status ?? "unknown"}</strong></p>
-          <a className="button" href={`${API_BASE}/v1/health`} target="_blank" rel="noreferrer">Open health endpoint</a>
+          <p>
+            Status: <strong>{health.status ?? 'unknown'}</strong>
+          </p>
+          <a className="button" href={`${API_BASE}/v1/health`} target="_blank" rel="noreferrer">
+            Open health endpoint
+          </a>
         </section>
 
         <section className="card">
           <h2>Integration Tokens</h2>
-          <p className="muted">Configured: {configuredCount}/{INTEGRATION_FIELDS.length}</p>
+          <p className="muted">
+            Configured: {configuredCount}/{INTEGRATION_FIELDS.length}
+          </p>
           <p className="muted">Isi token di sini. Field kosong tidak menimpa data lama.</p>
         </section>
 
         <section className="card">
           <h2>Accounts</h2>
           <p className="muted">Manage social accounts and credentials.</p>
-          <a className="button" href="#accounts">Go</a>
+          <a className="button" href="#accounts">
+            Go
+          </a>
         </section>
 
         <section className="card">
           <h2>Templates</h2>
           <p className="muted">Create reusable content templates.</p>
-          <a className="button" href="#templates">Go</a>
+          <a className="button" href="#templates">
+            Go
+          </a>
         </section>
 
         <section className="card">
-          <h2>Jobs</h2>
-          <p className="muted">Schedule and trigger posts.</p>
-          <a className="button" href="#jobs">Go</a>
+          <h2>Campaigns</h2>
+          <p className="muted">Create and blast marketing campaigns.</p>
+          <a className="button" href="#jobs">
+            Go
+          </a>
+        </section>
+
+        <section className="card">
+          <h2>Jobs (Legacy)</h2>
+          <p className="muted">Schedule and trigger posts (old flow).</p>
+          <a className="button" href="#jobs-old">
+            Go
+          </a>
         </section>
       </div>
 
       <div style={{ marginTop: 24 }} className="row">
-        <section className="card" style={{ gridColumn: "1 / -1" }}>
+        <section className="card" style={{ gridColumn: '1 / -1' }}>
           <h2>Save Integration Tokens</h2>
-          <p className="muted">Token disimpan terenkripsi di database lokal dan dibaca backend saat adapter dipakai.</p>
+          <p className="muted">
+            Token disimpan terenkripsi di database lokal dan dibaca backend saat adapter dipakai.
+          </p>
           <div className="grid">
             {INTEGRATION_FIELDS.map((field) => (
               <label key={field.key}>
@@ -124,55 +417,262 @@ export default function Page() {
                   type="password"
                   placeholder={field.placeholder}
                   value={form[field.key]}
-                  onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.value }))}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, [field.key]: event.target.value }))
+                  }
                 />
-                <small className="muted">Status: {configured[field.key] ? "saved" : "not set"}</small>
+                <small className="muted">
+                  Status: {configured[field.key] ? 'saved' : 'not set'}
+                </small>
               </label>
             ))}
           </div>
-          <button className="button" type="button" onClick={saveTokens}>Save Tokens</button>
+          <button className="button" type="button" onClick={saveTokens}>
+            Save Tokens
+          </button>
           {message ? <p className="muted">{message}</p> : null}
         </section>
 
         <section id="accounts" className="card">
           <h2>Create Account</h2>
           <label>Platform</label>
-          <select className="select" defaultValue="telegram">
-            <option>telegram</option>
-            <option>whatsapp</option>
-            <option>twitter</option>
-            <option>threads</option>
-            <option>instagram</option>
+          <select
+            className="select"
+            value={accountForm.platform}
+            onChange={(event) =>
+              setAccountForm((current) => ({ ...current, platform: event.target.value }))
+            }
+          >
+            <option value="telegram">telegram</option>
+            <option value="whatsapp">whatsapp</option>
+            <option value="twitter">twitter</option>
+            <option value="threads">threads</option>
+            <option value="instagram">instagram</option>
           </select>
           <label>Username</label>
-          <input className="input" defaultValue="test_account" />
+          <input
+            className="input"
+            value={accountForm.username}
+            onChange={(event) =>
+              setAccountForm((current) => ({ ...current, username: event.target.value }))
+            }
+          />
           <label>Credential</label>
-          <input className="input" defaultValue="secret-token" />
-          <button className="button" type="button">Save</button>
+          <input
+            className="input"
+            value={accountForm.credentials}
+            onChange={(event) =>
+              setAccountForm((current) => ({ ...current, credentials: event.target.value }))
+            }
+          />
+          <button className="button" type="button" onClick={createAccount}>
+            Save
+          </button>
+          <p className="muted">Latest account ID: {createdAccountId || 'none'}</p>
         </section>
 
         <section id="templates" className="card">
           <h2>Create Template</h2>
           <label>Name</label>
-          <input className="input" defaultValue="Promo" />
+          <input
+            className="input"
+            value={templateForm.name}
+            onChange={(event) =>
+              setTemplateForm((current) => ({ ...current, name: event.target.value }))
+            }
+          />
           <label>Content</label>
-          <textarea className="textarea" rows={4} defaultValue="Check this out {link}" />
+          <textarea
+            className="textarea"
+            rows={4}
+            value={templateForm.content}
+            onChange={(event) =>
+              setTemplateForm((current) => ({ ...current, content: event.target.value }))
+            }
+          />
           <label>Variables</label>
-          <input className="input" defaultValue="link" />
-          <button className="button" type="button">Save</button>
+          <input
+            className="input"
+            value={templateForm.variables}
+            onChange={(event) =>
+              setTemplateForm((current) => ({ ...current, variables: event.target.value }))
+            }
+          />
+          <label>Type</label>
+          <input
+            className="input"
+            value={templateForm.type}
+            onChange={(event) =>
+              setTemplateForm((current) => ({ ...current, type: event.target.value }))
+            }
+          />
+          <button className="button" type="button" onClick={createTemplate}>
+            Save
+          </button>
+          <p className="muted">Latest template ID: {createdTemplateId || 'none'}</p>
         </section>
 
         <section id="jobs" className="card">
-          <h2>Schedule Job</h2>
+          <h2>Create Campaign & Blast</h2>
+          <label>Campaign Name</label>
+          <input
+            className="input"
+            value={campaignForm.name}
+            onChange={(event) =>
+              setCampaignForm((current) => ({ ...current, name: event.target.value }))
+            }
+          />
+          <label>Campaign Content</label>
+          <textarea
+            className="textarea"
+            rows={3}
+            value={campaignForm.content}
+            onChange={(event) =>
+              setCampaignForm((current) => ({ ...current, content: event.target.value }))
+            }
+          />
+          <label>CTA Link</label>
+          <input
+            className="input"
+            value={campaignForm.cta_link}
+            onChange={(event) =>
+              setCampaignForm((current) => ({ ...current, cta_link: event.target.value }))
+            }
+          />
+          <label>Platforms</label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+            {['twitter', 'threads', 'instagram', 'facebook'].map((platform) => (
+              <label key={platform} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <input
+                  type="checkbox"
+                  checked={campaignForm.platforms.includes(platform)}
+                  onChange={(event) => {
+                    const platforms = campaignForm.platforms.includes(platform)
+                      ? campaignForm.platforms.filter((p) => p !== platform)
+                      : [...campaignForm.platforms, platform]
+                    setCampaignForm((current) => ({ ...current, platforms }))
+                  }}
+                />
+                {platform}
+              </label>
+            ))}
+          </div>
+          <div className="row">
+            <button className="button" type="button" onClick={createCampaign}>
+              Create Campaign
+            </button>
+            <button className="button" type="button" onClick={blastCampaign}>
+              Blast Campaign
+            </button>
+          </div>
+          <p className="muted">Selected campaign: {selectedCampaignId || 'none'}</p>
+        </section>
+
+        <section id="jobs-old" className="card">
+          <h2>Blast / Schedule Job (Legacy)</h2>
           <label>Cron</label>
-          <input className="input" defaultValue="* * * * *" />
+          <input
+            className="input"
+            value={jobForm.cron}
+            onChange={(event) =>
+              setJobForm((current) => ({ ...current, cron: event.target.value }))
+            }
+          />
           <label>Template ID</label>
-          <input className="input" defaultValue="tpl_1" />
+          <input
+            className="input"
+            value={jobForm.templateId}
+            onChange={(event) =>
+              setJobForm((current) => ({ ...current, templateId: event.target.value }))
+            }
+          />
           <label>Account ID</label>
-          <input className="input" defaultValue="acc_1" />
-          <button className="button" type="button">Schedule</button>
+          <input
+            className="input"
+            value={jobForm.accountId}
+            onChange={(event) =>
+              setJobForm((current) => ({ ...current, accountId: event.target.value }))
+            }
+          />
+          <label>Recipient / Target</label>
+          <input
+            className="input"
+            value={jobForm.recipient}
+            onChange={(event) =>
+              setJobForm((current) => ({ ...current, recipient: event.target.value }))
+            }
+          />
+          <label>Platform</label>
+          <select
+            className="select"
+            value={jobForm.platform}
+            onChange={(event) =>
+              setJobForm((current) => ({ ...current, platform: event.target.value }))
+            }
+          >
+            <option value="whatsapp">whatsapp</option>
+            <option value="telegram">telegram</option>
+            <option value="twitter">twitter</option>
+            <option value="threads">threads</option>
+            <option value="instagram">instagram</option>
+          </select>
+          <label>Message</label>
+          <textarea
+            className="textarea"
+            rows={3}
+            value={jobForm.message}
+            onChange={(event) =>
+              setJobForm((current) => ({ ...current, message: event.target.value }))
+            }
+          />
+          <div className="row">
+            <button className="button" type="button" onClick={scheduleJob}>
+              Schedule
+            </button>
+            <button className="button" type="button" onClick={blastNow}>
+              Blast now
+            </button>
+          </div>
+        </section>
+
+        <section className="card" style={{ gridColumn: '1 / -1' }}>
+          <h2>Current Records</h2>
+          <div className="grid">
+            <div>
+              <h3>Accounts</h3>
+              <ul>
+                {accounts.slice(0, 5).map((account) => (
+                  <li key={account.id}>
+                    {account.platform} - {account.username ?? account.id} -{' '}
+                    {account.status ?? 'active'}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3>Templates</h3>
+              <ul>
+                {templates.slice(0, 5).map((template) => (
+                  <li key={template.id}>
+                    {template.name} - {template.type}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3>Campaigns</h3>
+              <ul>
+                {campaigns.slice(0, 5).map((campaign) => (
+                  <li key={campaign.id}>
+                    {campaign.name} - {campaign.status}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          {actionState ? <p className="muted">{actionState}</p> : null}
         </section>
       </div>
     </main>
-  );
+  )
 }

@@ -81,7 +81,8 @@ router.put("/:id", async (req, res) => {
  */
 router.delete("/:id", async (req, res) => {
   const { id } = req.params;
-  const ok = accountsRepo.delete(id);
+  const repo = getAccountsRepo();
+  const ok = repo.delete(id);
   if (!ok) return res.status(404).json({ error: "Account not found" });
   res.json({ message: "Account deleted" });
 });

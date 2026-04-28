@@ -1,5 +1,5 @@
 import express, { Router } from "express";
-import { initDatabase } from "../db/sqlite";
+import { getDb } from "../db/sqlite";
 import { TemplatesRepo } from "../repos/templatesRepo";
 
 const router = Router();
@@ -26,7 +26,9 @@ function validateVariables(content: string, variables: string[]): boolean {
 /**
  * Simple CSV parser for MVP
  */
-function parseCsv(csvText: string): Partial<Template>[] {
+type TemplateInput = { name?: string; content?: string; variables?: string[]; type?: string }
+
+function parseCsv(csvText: string): TemplateInput[] {
   const lines = csvText.split(/\r?\n/).filter(line => line.trim() !== "");
   if (lines.length < 2) return [];
 
@@ -76,8 +78,6 @@ router.post("/import", express.text({ type: "text/csv" }), (req, res) => {
     const imported: any[] = [];
 
     for (const item of parsed) {
-      if (!item.name || !item.content || !item.type) continue;
-      
       if (!item.name || !item.content || !item.type) continue;
       if (!validateVariables(item.content, item.variables || [])) continue;
       const created = repo.create({ name: item.name, content: item.content, variables: item.variables || [], type: item.type });
