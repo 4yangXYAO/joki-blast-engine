@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import request from 'supertest'
 import express from 'express'
-import { initDatabase, runMigrations, getDb } from '../db/sqlite'
-import { createServer } from '../api/server'
+import { initDatabase, runMigrations, getDb } from './db/sqlite'
+import { createServer } from './api/server'
 
 describe('Smoke Test: Server & Basic Endpoints', () => {
   let server: express.Application

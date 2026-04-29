@@ -1,6 +1,6 @@
 # joki-blast-engine
 
-Production-focused Node.js/TypeScript blast engine with a Next.js dashboard, SQLite persistence, and platform adapters for WhatsApp, Telegram, Instagram, Twitter/X, and Threads.
+Production-focused Node.js/TypeScript blast engine with a Next.js dashboard, SQLite persistence, and platform adapters for WhatsApp, Telegram, Instagram, Twitter/X, Threads, and Facebook Pages.
 
 ## What works now
 
@@ -8,12 +8,21 @@ Production-focused Node.js/TypeScript blast engine with a Next.js dashboard, SQL
 - **Link Tracking**: Generate deterministic tracking tokens per campaign/platform and record click statistics.
 - **Inbound Auto-Reply**: Receive messages on WhatsApp/Telegram and send deterministic welcome message, then hand off to sales.
 - **Blast Engine**: Post content to multiple platforms simultaneously with exponential backoff retry and platform-specific rate limiting.
+- **Facebook Pages**: Publish page posts through the official Graph API v19.0 with Page access tokens.
 - Health check and runtime settings from the dashboard.
 - Create accounts, templates, and jobs from the dashboard UI.
 - Trigger an immediate blast from the dashboard UI.
 - Schedule jobs through the API.
 - Store integration tokens and credentials encrypted in SQLite.
 - WhatsApp via WAHA is configured through runtime settings or `.env`.
+
+## Facebook Pages Blast
+
+- The supported Facebook blast path is Pages posting through the Graph API v19.0.
+- The credential payload must contain `pageId` and `accessToken`.
+- Rate limit errors are mapped to a deterministic adapter code.
+- Expired token errors are mapped to a deterministic adapter code.
+- This repository does not implement browser-cookie automation for Facebook groups or forums.
 
 ## Campaign Workflow
 

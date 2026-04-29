@@ -1,5 +1,10 @@
 import express from 'express'
-import { accountsRouter } from './accounts'
+import { getDb } from '../db/sqlite'
+import { accountsRouter, getAccountsRepo } from './accounts'
+
+beforeEach(() => {
+  ;(getAccountsRepo as any)._reset?.()
+})
 
 async function startApp() {
   const app = express()
@@ -17,9 +22,9 @@ async function startApp() {
 }
 
 describe('Accounts crypto', () => {
-  it('should encrypt and decrypt correctly', () => {
-    const { encrypt, decrypt } = require('../utils/crypto')
+  it('should encrypt and decrypt correctly', async () => {
     process.env.JWT_SECRET = 'test-secret'
+    const { encrypt, decrypt } = await import('../utils/crypto')
     const original = 'my-credential'
     const encrypted = encrypt(original)
     const decrypted = decrypt(encrypted)
@@ -43,7 +48,11 @@ describe('Accounts API', () => {
     const res = await fetch(`${baseUrl}/v1/accounts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ platform: 'telegram', username: 'testuser', credentials: 'secret-tok' }),
+      body: JSON.stringify({
+        platform: 'telegram',
+        username: 'testuser',
+        credentials: 'secret-tok',
+      }),
     })
     const body = (await res.json()) as any
     await close()

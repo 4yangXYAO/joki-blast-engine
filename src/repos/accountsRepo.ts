@@ -82,6 +82,8 @@ export class AccountsRepo {
 
   delete(id: string): boolean {
     const db = this.db ?? getDb()
+    const existing = db.prepare('SELECT id FROM accounts WHERE id = ? LIMIT 1').get(id)
+    if (!existing) return false
     const res = db.prepare('DELETE FROM accounts WHERE id = ?').run(id)
     return res.changes > 0
   }

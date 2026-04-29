@@ -1,29 +1,30 @@
-// Unit tests for FacebookAdapter — mocks axios
 import { FacebookAdapter } from './facebook'
 
-vi.mock('axios', () => {
-  const instance = {
-    post: vi.fn(),
-    get: vi.fn(),
-    interceptors: { request: { use: vi.fn() }, response: { use: vi.fn() } },
-  }
-  return { default: { create: vi.fn(() => instance), post: vi.fn(), get: vi.fn(), ...instance }, __esModule: true }
-})
-
-import axios from 'axios'
-const mockedAxios = axios as any
-
-const PAGE_POST_RESPONSE = { data: { id: '123456789_987654321' } }
+const PAGE_POST_RESPONSE = { id: '123456789_987654321' }
 const VALID_CREDS = JSON.stringify({ pageId: '123456789', accessToken: 'EAAtest' })
 
 function makeAdapter(creds = VALID_CREDS) {
   return new FacebookAdapter(creds)
 }
 
+function mockFetchOnce(payload: any, ok = true, status = 200) {
+  const response = {
+    ok,
+    status,
+    text: vi.fn().mockResolvedValue(JSON.stringify(payload)),
+  }
+  globalThis.fetch = vi.fn().mockResolvedValue(response as any) as any
+  return response
+}
+
 describe('FacebookAdapter', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockedAxios.post = vi.fn().mockResolvedValue(PAGE_POST_RESPONSE)
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: vi.fn().mockResolvedValue(JSON.stringify(PAGE_POST_RESPONSE)),
+    } as any) as any
   })
 
   test('connect parses credentials correctly', async () => {
@@ -50,28 +51,43 @@ describe('FacebookAdapter', () => {
     const adapter = makeAdapter()
     const res = await adapter.sendMessage('unused', 'Hello from blast!')
     expect(res.success).toBe(true)
-    expect(mockedAxios.post).toHaveBeenCalledWith(
-      expect.stringContaining('/feed'),
-      expect.objectContaining({ message: 'Hello from blast!' })
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/v19.0/123456789/feed'),
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'Content-Type': 'application/x-www-form-urlencoded',
+        }),
+      })
     )
   })
 
   test('sendMessage returns failure on HTTP error', async () => {
-    mockedAxios.post = vi.fn().mockRejectedValue(new Error('Network error'))
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: vi
+        .fn()
+        .mockResolvedValue(JSON.stringify({ error: { message: 'Network error', code: 500 } })),
+    } as any) as any
     const adapter = makeAdapter()
     const res = await adapter.sendMessage('unused', 'fail')
     expect(res.success).toBe(false)
-    expect(res.code).toBe('FACEBOOK_POST_ERROR')
+    expect(res.code).toBe('500')
   })
 
   test('replyToMessage posts to comment thread', async () => {
-    mockedAxios.post = vi.fn().mockResolvedValue({ data: { id: 'comment_123' } })
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: vi.fn().mockResolvedValue(JSON.stringify({ id: 'comment_123' })),
+    } as any) as any
     const adapter = makeAdapter()
     const res = await adapter.replyToMessage('comment_999', 'Nice post!')
     expect(res.success).toBe(true)
-    expect(mockedAxios.post).toHaveBeenCalledWith(
-      expect.stringContaining('comment_999/comments'),
-      expect.objectContaining({ message: 'Nice post!' })
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/v19.0/comment_999/comments'),
+      expect.objectContaining({ method: 'POST' })
     )
   })
 
@@ -80,5 +96,33 @@ describe('FacebookAdapter', () => {
     const status = await adapter.getRateLimitStatus()
     expect(status!.limit).toBe(100)
     expect(typeof status!.remaining).toBe('number')
+  })
+
+  test('sendMessage maps Graph code 4 to rate limit error', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      text: vi
+        .fn()
+        .mockResolvedValue(JSON.stringify({ error: { message: 'rate limited', code: 4 } })),
+    } as any) as any
+    const adapter = makeAdapter()
+    const res = await adapter.sendMessage('unused', 'Hello')
+    expect(res.success).toBe(false)
+    expect(res.code).toBe('RATE_LIMIT_EXCEEDED')
+  })
+
+  test('sendMessage maps Graph code 190 to token expired', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      text: vi
+        .fn()
+        .mockResolvedValue(JSON.stringify({ error: { message: 'token expired', code: 190 } })),
+    } as any) as any
+    const adapter = makeAdapter()
+    const res = await adapter.sendMessage('unused', 'Hello')
+    expect(res.success).toBe(false)
+    expect(res.code).toBe('TOKEN_EXPIRED')
   })
 })

@@ -99,14 +99,14 @@ describe('E2E Test: Full Marketing Campaign Workflow', () => {
       .post('/v1/webhooks/waha')
       .send({
         event: 'message',
-        data: {
+        payload: {
           from: '62812345678',
           chatId: '62812345678@c.us',
           body: 'Halo, saya tertarik dengan promo ini',
           timestamp: Date.now(),
         },
       })
-    expect(inboundRes.status).toBe(200 || 201 || 202)
+    expect(inboundRes.status).toBe(200)
     console.log(`✓ Inbound WhatsApp message processed`)
 
     // 7. Verify lead was created and welcome sent
@@ -127,7 +127,7 @@ describe('E2E Test: Full Marketing Campaign Workflow', () => {
       .post('/v1/webhooks/waha')
       .send({
         event: 'message',
-        data: {
+        payload: {
           from: '62812345678',
           chatId: '62812345678@c.us',
           body: 'I am following up',
