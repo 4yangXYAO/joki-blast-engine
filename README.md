@@ -58,14 +58,69 @@ Production-focused Node.js/TypeScript blast engine with a Next.js dashboard, SQL
   3. Marks lead as "awaiting_handoff" for manual sales negotiation
   4. Prevents duplicate welcome messages via idempotent lead storage
 
-## Local run
+## Getting Started
 
-1. Install dependencies in the root project.
-2. Install dashboard dependencies with `cd dashboard && npm install`.
-3. Initialize the database with `npm run db:init`.
-4. Start the API with `npm run dev:api`.
-5. Start the dashboard with `cd dashboard && npm run dev`.
-6. Open `http://localhost:3001` in Chrome.
+These steps show a quick local setup for development and testing.
+
+1. Clone the repo and install root dependencies:
+
+  ```bash
+  git clone <repo-url>
+  cd joki-blast-engine
+  npm install
+  ```
+
+2. Install and run the dashboard (in a separate terminal):
+
+  ```bash
+  cd dashboard
+  npm install
+  npm run dev        # runs the Next.js dashboard in dev mode (port configured in dashboard/package.json)
+  ```
+
+3. Initialize the database (creates local SQLite DB and runs migrations):
+
+  ```bash
+  npm run db:init
+  ```
+
+4. Start the backend API in development mode:
+
+  ```bash
+  npm run dev:api
+  ```
+
+  The API entrypoint uses `src/api/server`. The `dev:api` script starts the server with `ts-node` and `dotenv`.
+
+5. Build the dashboard for production (optional):
+
+  ```bash
+  npm --prefix dashboard run build
+  ```
+
+6. Run tests and validations:
+
+  ```bash
+  npm test                      # run backend tests (Vitest)
+  npm run validate:config       # run config validation checks
+  ```
+
+7. Environment and runtime
+
+  - Create a `.env` file at the repo root for local secrets (see `Environment` below).
+  - The API will read runtime settings and credentials from environment variables and from the SQLite database.
+
+8. Helpful script references (root `package.json`):
+
+  - `npm run db:init` — initialize DB + run migrations
+  - `npm run dev:api` — run API in dev (ts-node)
+  - `npm test` — run test suite (Vitest)
+
+Open the dashboard in your browser (default port configured in `dashboard/package.json`), for example:
+
+```
+http://localhost:3001
+```
 
 ## Environment
 
