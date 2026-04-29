@@ -129,7 +129,6 @@ export async function initSqlJsDatabase(dbPath: string): Promise<DB> {
   return _db
 }
 
-
 export function getDb(): DB {
   if (!_db)
     throw new Error(
@@ -212,14 +211,12 @@ export function runMigrations(migrationsDir: string): void {
       const sql = fs.readFileSync(full, 'utf8')
 
       if (!_isSqlJs) {
+        // Apply migration directly (no explicit transaction wrapper to avoid nesting)
+        db.exec(sql)
         const insert = db.prepare(
           "INSERT INTO schema_migrations(name, applied_at) VALUES (?, datetime('now'))"
         )
-        const apply = db.transaction(() => {
-          db.exec(sql)
-          insert.run(file)
-        })
-        apply()
+        insert.run(file)
       } else {
         db.exec(sql)
         db.exec(

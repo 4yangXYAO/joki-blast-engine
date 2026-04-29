@@ -4,6 +4,14 @@ import { useEffect, useMemo, useState } from 'react'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? 'http://127.0.0.1:3000'
 
+function isFacebookPlatform(platform: string) {
+  return platform === 'facebook' || platform === 'facebook-page'
+}
+
+function buildFacebookCredentials(pageId: string, accessToken: string) {
+  return JSON.stringify({ pageId, accessToken })
+}
+
 const INTEGRATION_FIELDS = [
   { key: 'WHATSAPP_CLOUD_API_TOKEN', label: 'WhatsApp Cloud API Token', placeholder: 'EAA...' },
   { key: 'TELEGRAM_BOT_TOKEN', label: 'Telegram Bot Token', placeholder: '123456:ABC...' },
@@ -40,6 +48,8 @@ type AccountFormState = {
   platform: string
   username: string
   credentials: string
+  facebookPageId: string
+  facebookAccessToken: string
 }
 
 type TemplateFormState = {
@@ -65,6 +75,12 @@ type CampaignFormState = {
   platforms: string[] // Array of selected platforms
 }
 
+type FacebookCampaignFormState = {
+  name: string
+  content: string
+  cta_link: string
+}
+
 function makeEmptyForm() {
   return INTEGRATION_FIELDS.reduce(
     (acc, field) => {
@@ -84,6 +100,8 @@ export default function Page() {
     platform: 'whatsapp',
     username: 'test_account',
     credentials: 'secret-token',
+    facebookPageId: '',
+    facebookAccessToken: '',
   })
   const [templateForm, setTemplateForm] = useState<TemplateFormState>({
     name: 'Promo',
@@ -112,10 +130,17 @@ export default function Page() {
     cta_link: 'https://wa.me/62812345678',
     platforms: ['twitter', 'threads'],
   })
+  const [facebookCampaignForm, setFacebookCampaignForm] = useState<FacebookCampaignFormState>({
+    name: 'Facebook Promo',
+    content: 'Halo Facebook Page! Ada promo baru yang siap jalan.',
+    cta_link: 'https://example.com',
+  })
   const [campaigns, setCampaigns] = useState<Array<{ id: string; name: string; status: string }>>(
     []
   )
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>('')
+  const [facebookCampaignId, setFacebookCampaignId] = useState<string>('')
+  const [facebookAccountId, setFacebookAccountId] = useState<string>('')
 
   useEffect(() => {
     const load = async () => {
@@ -147,6 +172,14 @@ export default function Page() {
       setAccounts(Array.isArray(accountsResponse) ? accountsResponse : [])
       setTemplates(Array.isArray(templatesResponse) ? templatesResponse : [])
       setCampaigns(Array.isArray(campaignsResponse) ? campaignsResponse : [])
+      const facebookAccounts = Array.isArray(accountsResponse)
+        ? accountsResponse.filter((account: { platform?: string }) =>
+            isFacebookPlatform(String(account?.platform ?? ''))
+          )
+        : []
+      if (!facebookAccountId && facebookAccounts.length > 0) {
+        setFacebookAccountId(facebookAccounts[0].id)
+      }
       if (!createdAccountId && Array.isArray(accountsResponse) && accountsResponse.length > 0) {
         setCreatedAccountId(accountsResponse[0].id)
       }
@@ -166,6 +199,11 @@ export default function Page() {
   const configuredCount = useMemo(
     () => Object.values(configured).filter(Boolean).length,
     [configured]
+  )
+
+  const facebookAccounts = useMemo(
+    () => accounts.filter((account) => isFacebookPlatform(account.platform)),
+    [accounts]
   )
 
   async function saveTokens() {
@@ -195,16 +233,38 @@ export default function Page() {
   async function createAccount() {
     setActionState('Creating account...')
     try {
+      const credentials = isFacebookPlatform(accountForm.platform)
+        ? buildFacebookCredentials(
+            accountForm.facebookPageId.trim(),
+            accountForm.facebookAccessToken.trim()
+          )
+        : accountForm.credentials
+
+      if (isFacebookPlatform(accountForm.platform)) {
+        if (!accountForm.facebookPageId.trim() || !accountForm.facebookAccessToken.trim()) {
+          throw new Error('Facebook Page ID and Access Token are required')
+        }
+      } else if (!accountForm.credentials.trim()) {
+        throw new Error('Credential is required')
+      }
+
       const response = await fetch(`${API_BASE}/v1/accounts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(accountForm),
+        body: JSON.stringify({
+          platform: accountForm.platform,
+          username: accountForm.username,
+          credentials,
+        }),
       })
       const data = await response.json()
       if (!response.ok) {
         throw new Error(data?.error ?? 'Failed to create account')
       }
       setCreatedAccountId(data.id)
+      if (isFacebookPlatform(accountForm.platform)) {
+        setFacebookAccountId(data.id)
+      }
       setJobForm((current) => ({ ...current, accountId: data.id, platform: accountForm.platform }))
       setActionState(`Account created: ${data.id}`)
       await refreshCollections()
@@ -316,23 +376,89 @@ export default function Page() {
     }
   }
 
+  async function createFacebookCampaign() {
+    setActionState('Creating Facebook campaign...')
+    try {
+      const response = await fetch(`${API_BASE}/v1/campaigns`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: facebookCampaignForm.name,
+          content: facebookCampaignForm.content,
+          cta_link: facebookCampaignForm.cta_link,
+          platforms: ['facebook'],
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.error ?? 'Failed to create Facebook campaign')
+      }
+      setFacebookCampaignId(data.id)
+      setSelectedCampaignId(data.id)
+      setActionState(`Facebook campaign created: ${data.id}`)
+      await refreshCollections()
+    } catch (error: any) {
+      setActionState(error?.message ?? 'Failed to create Facebook campaign')
+    }
+  }
+
+  async function blastFacebookCampaign() {
+    setActionState('Blasting Facebook campaign...')
+    try {
+      const targetCampaignId = facebookCampaignId || selectedCampaignId
+      if (!targetCampaignId) {
+        throw new Error('No Facebook campaign selected')
+      }
+      if (!facebookAccountId) {
+        throw new Error('No Facebook Page account selected')
+      }
+      const response = await fetch(`${API_BASE}/v1/campaigns/${targetCampaignId}/blast`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          account_ids: {
+            facebook: facebookAccountId,
+          },
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.error ?? 'Failed to blast Facebook campaign')
+      }
+      setActionState(`Facebook campaign blasted: ${data.campaign_id ?? 'ok'}`)
+      await refreshCollections()
+    } catch (error: any) {
+      setActionState(error?.message ?? 'Failed to blast Facebook campaign')
+    }
+  }
+
   async function blastCampaign() {
     setActionState('Blasting campaign...')
     try {
       if (!selectedCampaignId) {
         throw new Error('No campaign selected')
       }
+      const selectedCampaign = campaigns.find((campaign: any) => campaign.id === selectedCampaignId)
+      const targetPlatforms =
+        Array.isArray((selectedCampaign as any)?.platforms) &&
+        (selectedCampaign as any).platforms.length > 0
+          ? ((selectedCampaign as any).platforms as string[])
+          : campaignForm.platforms
+      const accountIds = targetPlatforms.reduce<Record<string, string>>((acc, platform) => {
+        if (platform === 'facebook') {
+          if (!facebookAccountId) {
+            throw new Error('Select a Facebook Page account before blasting')
+          }
+          acc.facebook = facebookAccountId
+          return acc
+        }
+        acc[platform] = createdAccountId
+        return acc
+      }, {})
       const response = await fetch(`${API_BASE}/v1/campaigns/${selectedCampaignId}/blast`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          account_ids: {
-            twitter: createdAccountId,
-            threads: createdAccountId,
-            instagram: createdAccountId,
-            facebook: createdAccountId,
-          },
-        }),
+        body: JSON.stringify({ account_ids: accountIds }),
       })
       const data = await response.json()
       if (!response.ok) {
@@ -435,6 +561,10 @@ export default function Page() {
 
         <section id="accounts" className="card">
           <h2>Create Account</h2>
+          <p className="muted">
+            For Facebook Pages, enter the Page ID and Access Token. The dashboard will package them
+            into the JSON payload expected by the worker.
+          </p>
           <label>Platform</label>
           <select
             className="select"
@@ -448,6 +578,8 @@ export default function Page() {
             <option value="twitter">twitter</option>
             <option value="threads">threads</option>
             <option value="instagram">instagram</option>
+            <option value="facebook">facebook</option>
+            <option value="facebook-page">facebook-page</option>
           </select>
           <label>Username</label>
           <input
@@ -457,14 +589,41 @@ export default function Page() {
               setAccountForm((current) => ({ ...current, username: event.target.value }))
             }
           />
-          <label>Credential</label>
-          <input
-            className="input"
-            value={accountForm.credentials}
-            onChange={(event) =>
-              setAccountForm((current) => ({ ...current, credentials: event.target.value }))
-            }
-          />
+          {isFacebookPlatform(accountForm.platform) ? (
+            <>
+              <label>Facebook Page ID</label>
+              <input
+                className="input"
+                value={accountForm.facebookPageId}
+                onChange={(event) =>
+                  setAccountForm((current) => ({ ...current, facebookPageId: event.target.value }))
+                }
+              />
+              <label>Facebook Access Token</label>
+              <input
+                className="input"
+                type="password"
+                value={accountForm.facebookAccessToken}
+                onChange={(event) =>
+                  setAccountForm((current) => ({
+                    ...current,
+                    facebookAccessToken: event.target.value,
+                  }))
+                }
+              />
+            </>
+          ) : (
+            <>
+              <label>Credential</label>
+              <input
+                className="input"
+                value={accountForm.credentials}
+                onChange={(event) =>
+                  setAccountForm((current) => ({ ...current, credentials: event.target.value }))
+                }
+              />
+            </>
+          )}
           <button className="button" type="button" onClick={createAccount}>
             Save
           </button>
@@ -514,6 +673,59 @@ export default function Page() {
 
         <section id="jobs" className="card">
           <h2>Create Campaign & Blast</h2>
+          <h3>Facebook Page Blast</h3>
+          <p className="muted">
+            This path is for Facebook Pages only and expects a Facebook Page account created in the
+            Accounts section.
+          </p>
+          <label>Facebook Page Account</label>
+          <select
+            className="select"
+            value={facebookAccountId}
+            onChange={(event) => setFacebookAccountId(event.target.value)}
+          >
+            <option value="">Select a Facebook Page account</option>
+            {facebookAccounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.username ?? account.id} ({account.platform})
+              </option>
+            ))}
+          </select>
+          <label>Campaign Name</label>
+          <input
+            className="input"
+            value={facebookCampaignForm.name}
+            onChange={(event) =>
+              setFacebookCampaignForm((current) => ({ ...current, name: event.target.value }))
+            }
+          />
+          <label>Campaign Content</label>
+          <textarea
+            className="textarea"
+            rows={3}
+            value={facebookCampaignForm.content}
+            onChange={(event) =>
+              setFacebookCampaignForm((current) => ({ ...current, content: event.target.value }))
+            }
+          />
+          <label>CTA Link</label>
+          <input
+            className="input"
+            value={facebookCampaignForm.cta_link}
+            onChange={(event) =>
+              setFacebookCampaignForm((current) => ({ ...current, cta_link: event.target.value }))
+            }
+          />
+          <div className="row">
+            <button className="button" type="button" onClick={createFacebookCampaign}>
+              Create Facebook Campaign
+            </button>
+            <button className="button" type="button" onClick={blastFacebookCampaign}>
+              Blast Facebook Campaign
+            </button>
+          </div>
+          <p className="muted">Selected Facebook campaign: {facebookCampaignId || 'none'}</p>
+          <hr style={{ borderColor: '#334155', margin: '20px 0' }} />
           <label>Campaign Name</label>
           <input
             className="input"

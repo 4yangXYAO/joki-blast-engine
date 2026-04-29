@@ -24,6 +24,13 @@ Production-focused Node.js/TypeScript blast engine with a Next.js dashboard, SQL
 - Expired token errors are mapped to a deterministic adapter code.
 - This repository does not implement browser-cookie automation for Facebook groups or forums.
 
+**See [FACEBOOK_PAGES_BLAST.md](docs/FACEBOOK_PAGES_BLAST.md) for a complete step-by-step guide on how to:**
+
+- Get Facebook Page ID and Access Token
+- Create a Facebook Page account in the dashboard
+- Create and blast campaigns to Facebook
+- Handle errors and troubleshoot issues
+
 ## Campaign Workflow
 
 ### 1. Create Campaign
@@ -64,57 +71,57 @@ These steps show a quick local setup for development and testing.
 
 1. Clone the repo and install root dependencies:
 
-  ```bash
-  git clone <repo-url>
-  cd joki-blast-engine
-  npm install
-  ```
+```bash
+git clone <repo-url>
+cd joki-blast-engine
+npm install
+```
 
 2. Install and run the dashboard (in a separate terminal):
 
-  ```bash
-  cd dashboard
-  npm install
-  npm run dev        # runs the Next.js dashboard in dev mode (port configured in dashboard/package.json)
-  ```
+```bash
+cd dashboard
+npm install
+npm run dev        # runs the Next.js dashboard in dev mode (port configured in dashboard/package.json)
+```
 
 3. Initialize the database (creates local SQLite DB and runs migrations):
 
-  ```bash
-  npm run db:init
-  ```
+```bash
+npm run db:init
+```
 
 4. Start the backend API in development mode:
 
-  ```bash
-  npm run dev:api
-  ```
+```bash
+npm run dev:api
+```
 
-  The API entrypoint uses `src/api/server`. The `dev:api` script starts the server with `ts-node` and `dotenv`.
+The API entrypoint uses `src/api/server`. The `dev:api` script starts the server with `ts-node` and `dotenv`.
 
 5. Build the dashboard for production (optional):
 
-  ```bash
-  npm --prefix dashboard run build
-  ```
+```bash
+npm --prefix dashboard run build
+```
 
 6. Run tests and validations:
 
-  ```bash
-  npm test                      # run backend tests (Vitest)
-  npm run validate:config       # run config validation checks
-  ```
+```bash
+npm test                      # run backend tests (Vitest)
+npm run validate:config       # run config validation checks
+```
 
 7. Environment and runtime
 
-  - Create a `.env` file at the repo root for local secrets (see `Environment` below).
-  - The API will read runtime settings and credentials from environment variables and from the SQLite database.
+- Create a `.env` file at the repo root for local secrets (see `Environment` below).
+- The API will read runtime settings and credentials from environment variables and from the SQLite database.
 
 8. Helpful script references (root `package.json`):
 
-  - `npm run db:init` — initialize DB + run migrations
-  - `npm run dev:api` — run API in dev (ts-node)
-  - `npm test` — run test suite (Vitest)
+- `npm run db:init` — initialize DB + run migrations
+- `npm run dev:api` — run API in dev (ts-node)
+- `npm test` — run test suite (Vitest)
 
 Open the dashboard in your browser (default port configured in `dashboard/package.json`), for example:
 
