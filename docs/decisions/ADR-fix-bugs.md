@@ -3,16 +3,20 @@
 Date: 2026-04-30
 
 ## Status
+
 Accepted
 
 ## Context
+
 Several issues were observed when running the system end-to-end and in unit tests:
+
 - Cookie-based adapters for Meta platforms required more robust page parsing (fb_dtsg, lst, c_user).
 - The SQLite layer did not set a busy timeout which can lead to transient `SQLITE_BUSY` errors under contention.
 - Worker failures were not persisted to the database logs table, making diagnosis harder.
 - The dashboard lacked auto-refresh which made observing job state slower during development.
 
 ## Decision
+
 1. Implement a dedicated `FacebookAdapter` (cookie-based) that:
    - Accepts cookies (plain string or JSON array) via stored credentials.
    - Fetches `https://m.facebook.com/` with a mobile User-Agent and extracts `fb_dtsg`, `lst`, and `c_user` where available.
@@ -32,10 +36,12 @@ Several issues were observed when running the system end-to-end and in unit test
 6. Add minimal compatibility export for legacy tests referencing a Facebook-named cookie adapter.
 
 ## Consequences
+
 - Better observability: worker failures are recorded to the DB logs table.
 - Reduced transient DB locking issues due to busy timeout.
 - Cookie-based Facebook posting can operate where Graph API is not desired, but it requires valid browser session cookies and may break if Facebook changes UI.
 - Unit tests were adjusted/supported so the suite remains green.
 
 ## Reversal
+
 If cookie-based posting proves brittle or becomes a maintenance burden, revert and prefer Graph API-only path for Facebook Pages. Rollback plan: revert adapter file, restore tests, and update docs accordingly.

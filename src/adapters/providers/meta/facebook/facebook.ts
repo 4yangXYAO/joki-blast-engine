@@ -90,28 +90,21 @@ export class FacebookAdapter implements IAdapter {
     _to: string,
     message: string
   ): Promise<{ success: boolean; error?: string; code?: string }> {
-    if (!this.cookieHeader) await this.connect()
-    this.maybeDrainRate()
-    if (this.rateRemaining <= 0) {
-      return { success: false, code: 'RATE_LIMIT_EXCEEDED', error: 'Rate limit exceeded' }
-    }
-
-    if (!this.fbDtsg) {
-      // Try to reconnect to obtain fb_dtsg
-      try {
-        await this.connect()
-      } catch (err: any) {
-        if (err?.name === 'AuthError')
-          return { success: false, code: 'AUTH_EXPIRED', error: String(err.message) }
-        return {
-          success: false,
-          code: 'CONNECT_FAILED',
-          error: String(err?.message ?? 'connect failed'),
-        }
-      }
-    }
-
     try {
+      if (!this.cookieHeader) {
+        await this.connect()
+      }
+
+      this.maybeDrainRate()
+      if (this.rateRemaining <= 0) {
+        return { success: false, code: 'RATE_LIMIT_EXCEEDED', error: 'Rate limit exceeded' }
+      }
+
+      if (!this.fbDtsg) {
+        // Try to reconnect to obtain fb_dtsg
+        await this.connect()
+      }
+
       const client = createHttpClient({
         baseURL: 'https://m.facebook.com',
         timeout: 15000,

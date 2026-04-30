@@ -4,26 +4,46 @@
   attempt: number,
   jitter: number = 0.1
 ): number {
-  const delay = base * Math.pow(multiplier, attempt);
-  const variance = delay * jitter * (Math.random() * 2 - 1);
-  return Math.floor(delay + variance);
+  const delay = base * Math.pow(multiplier, attempt)
+  const variance = delay * jitter * (Math.random() * 2 - 1)
+  return Math.floor(delay + variance)
+}
+
+export function isAuthExpiredError(error: any): boolean {
+  return error?.code === 'AUTH_EXPIRED' || error?.name === 'AuthError'
 }
 
 export function isRetryableError(error: any): boolean {
+  if (isAuthExpiredError(error)) {
+    return false
+  }
+
   // If it is an axios error or similar with response status
   if (error?.response?.status) {
-    const status = error.response.status;
-    if (status >= 500) return true; // Server errors
-    if (status === 429) return true; // Rate limits
-    return false; // Client errors (400, 401, 403, 404)
+    const status = error.response.status
+    if (status >= 500) return true // Server errors
+    if (status === 429) return true // Rate limits
+    return false // Client errors (400, 401, 403, 404)
   }
 
   // Network errors
-  const code = error?.code || error?.cause?.code;
-  if (["ECONNREFUSED", "ETIMEDOUT", "ECONNRESET", "ENOTFOUND"].includes(code)) {
-    return true;
+  const code = error?.code || error?.cause?.code
+  if (['ECONNREFUSED', 'ETIMEDOUT', 'ECONNRESET', 'ENOTFOUND'].includes(code)) {
+    return true
   }
 
   // Default to true for unknown errors to be safe
-  return true; 
+  return true
+}
+
+export function getRetryMaxAttemptsForError(error: any): number {
+  if (isAuthExpiredError(error)) {
+    return 0
+  }
+
+  if (isRetryableError(error)) {
+    return 5
+  }
+
+  return 0
 }

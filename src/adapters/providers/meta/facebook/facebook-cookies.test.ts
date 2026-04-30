@@ -1,67 +1,69 @@
-// Unit tests for FACookieAdapter — mocks axios
-import { FcebookCookieAdapter } from '../instagram/instagram-cookie'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-vi.mock('axios', () => {
-  const instance = {
-    post: vi.fn(),
-    get: vi.fn(),
-    interceptors: { request: { use: vi.fn() }, response: { use: vi.fn() } },
+// Unit tests for FacebookAdapter — mocks the shared HTTP client
+const { getMock, postMock, createHttpClientMock, parseCookiesMock } = vi.hoisted(() => {
+  const getMock = vi.fn()
+  const postMock = vi.fn()
+  return {
+    getMock,
+    postMock,
+    createHttpClientMock: vi.fn(() => ({ get: getMock, post: postMock })),
+    parseCookiesMock: vi.fn((raw: string) => raw.trim()),
   }
-  return { default: { create: vi.fn(() => instance), ...instance }, __esModule: true }
 })
 
-import axios from 'axios'
-const mockedAxios = axios as any
+vi.mock('../../../../utils/http-client', () => ({
+  createHttpClient: createHttpClientMock,
+  parseCookies: parseCookiesMock,
+}))
 
-function makeAdapter(cookie = 'sessionid=abc; csrftoken=tok') {
-  return new FcebookCookieAdapter(cookie)
+import { FacebookAdapter } from './facebook'
+
+function makeAdapter(cookie = 'sessionid=abc; c_user=12345; xs=tok') {
+  return new FacebookAdapter(cookie)
 }
 
-describe('FacebookCookieAdapter', () => {
+describe('FacebookAdapter', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    // Default mock for axios.create() to return a post/get mock
-    mockedAxios.create.mockReturnValue({
-      post: vi.fn().mockResolvedValue({ status: 200, data: { status: 'ok' } }),
-      get: vi.fn(),
+    getMock.mockResolvedValue({
+      data: '<input name="fb_dtsg" value="fb-token"><input name="lst" value="lst-token">',
     })
+    postMock.mockResolvedValue({ status: 200, data: { status: 'ok' } })
   })
 
-  test('connect parses cookies', async () => {
+  test('connect parses cookies and loads fb_dtsg', async () => {
     const adapter = makeAdapter()
     await expect(adapter.connect()).resolves.toBeUndefined()
+    expect(parseCookiesMock).toHaveBeenCalledWith('sessionid=abc; c_user=12345; xs=tok')
   })
 
   test('connect throws when cookie is empty', async () => {
-    const adapter = new FcebookCookieAdapter('')
+    const adapter = new FacebookAdapter('')
     await expect(adapter.connect()).rejects.toThrow('Facebook cookie not provided')
   })
 
-  test('sendMessage calls internal configure endpoint and returns success', async () => {
-    const mockPost = vi.fn().mockResolvedValue({ status: 200, data: { status: 'ok' } })
-    mockedAxios.create.mockReturnValue({ post: mockPost })
+  test('sendMessage posts to mobile create endpoint and returns success', async () => {
     const adapter = makeAdapter()
-    const res = await adapter.sendMessage('unused', 'Hello IG!')
+    const res = await adapter.sendMessage('unused', 'Hello FB!')
     expect(res.success).toBe(true)
-    expect(mockPost).toHaveBeenCalledWith('/api/v1/media/configure/', expect.any(String))
+    expect(postMock).toHaveBeenCalledWith(
+      '/a/home.php',
+      expect.stringContaining('xhpc_message_text=Hello+FB%21'),
+      expect.objectContaining({
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      })
+    )
   })
 
-  test('sendMessage returns failure on HTTP error', async () => {
-    const mockPost = vi.fn().mockRejectedValue(new Error('Network Error'))
-    mockedAxios.create.mockReturnValue({ post: mockPost })
+  test('sendMessage returns AUTH_EXPIRED on login redirect', async () => {
+    getMock.mockResolvedValueOnce({
+      data: '<form action="https://m.facebook.com/login.php"><input name="login" /></form>',
+    })
     const adapter = makeAdapter()
     const res = await adapter.sendMessage('unused', 'fail')
     expect(res.success).toBe(false)
-    expect(res.code).toBe('IG_COOKIE_POST_ERROR')
-  })
-
-  test('replyToMessage calls comment endpoint', async () => {
-    const mockPost = vi.fn().mockResolvedValue({ status: 200, data: { status: 'ok' } })
-    mockedAxios.create.mockReturnValue({ post: mockPost })
-    const adapter = makeAdapter()
-    const res = await adapter.replyToMessage('media_123', 'Nice post!')
-    expect(res.success).toBe(true)
-    expect(mockPost).toHaveBeenCalledWith('/api/v1/media/media_123/comment/', expect.any(String))
+    expect(res.code).toBe('AUTH_EXPIRED')
   })
 
   test('getRateLimitStatus returns expected shape', async () => {
@@ -72,13 +74,13 @@ describe('FacebookCookieAdapter', () => {
     expect(typeof status!.remaining).toBe('number')
   })
 
-  test('disconnect clears cookie', async () => {
+  test('disconnect clears cookie state', async () => {
     const adapter = makeAdapter()
     await adapter.connect()
     await adapter.disconnect()
-    // After disconnect, sendMessage should reconnect (no throw, just handled)
-    const mockPost = vi.fn().mockResolvedValue({ status: 200, data: { status: 'ok' } })
-    mockedAxios.create.mockReturnValue({ post: mockPost })
+    getMock.mockResolvedValueOnce({
+      data: '<input name="fb_dtsg" value="fb-token"><input name="lst" value="lst-token">',
+    })
     const res = await adapter.sendMessage('unused', 're-connect test')
     expect(res.success).toBe(true)
   })
