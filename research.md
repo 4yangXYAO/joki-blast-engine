@@ -2,6 +2,28 @@
 
 ## Question
 
+How should the dashboard resolve the API base so local access works without manual configuration?
+
+## Options
+
+| Approach                              | Good                                                     | Bad                                                                      | Risk   | Score |
+| ------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------ | ------ | ----- |
+| A. Hardcoded local default to 3456    | Works out of the box with the existing backend port      | Needs code change if local API port changes                              | Low    | 9/10  |
+| B. Public env var override            | Flexible for different environments                      | Requires env configuration before the UI becomes usable                  | Medium | 8/10  |
+| C. Relative proxy through same origin | No port mismatch if a reverse proxy fronts both services | Requires deployment/runtime proxy setup that is not present in this repo | Medium | 6/10  |
+
+## Prior Art
+
+- The backend already listens on `3456` in local development.
+- Next.js client components can only read `NEXT_PUBLIC_*` values at build time.
+- Dashboards commonly keep a local default and allow env overrides for non-local deployments.
+
+## Research Summary
+
+Use a local default of `http://127.0.0.1:3456` and keep `NEXT_PUBLIC_API_BASE` as an override for other environments.
+
+## Question
+
 How should `joki-blast-engine` publish to Facebook in a way that is stable, production-friendly, and testable?
 
 ## Options

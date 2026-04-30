@@ -1,5 +1,17 @@
 # Risks
 
+## Dashboard Access Risks
+
+- If the dashboard points at the wrong API port, health checks and form submissions fail even when the backend is healthy.
+- If `NEXT_PUBLIC_API_BASE` is set incorrectly, the UI can appear offline until the env value is corrected.
+- If the backend port changes without a matching UI update, local access breaks again.
+
+## Mitigations
+
+- Keep the dashboard default aligned with the backend dev port.
+- Allow an explicit env override for non-local deployments.
+- Verify the health endpoint in tests and during manual smoke checks.
+
 ## Technical Risks
 
 - Token expiry can stop posting until a new Page access token is stored.

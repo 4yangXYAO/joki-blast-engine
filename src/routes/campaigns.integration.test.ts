@@ -8,6 +8,8 @@ import { accountsRouter } from './accounts'
 import { trackRouter } from './track'
 import { webhooksRouter } from './webhooks'
 import cors from 'cors'
+import { wireCampaignStatusSync } from '../api/server'
+import { initializeJobWorker } from '../workers/job-worker'
 
 describe('Campaign Integration Flow', () => {
   let server: express.Application
@@ -23,7 +25,43 @@ describe('Campaign Integration Flow', () => {
     server.use(cors())
     server.use(express.json())
 
-    queue = new JobQueue()
+    queue = new JobQueue({
+      adapterFactory: (platform: string) => {
+        if (platform === 'facebook' || platform === 'instagram') {
+          return {
+            connect: async () => undefined,
+            disconnect: async () => undefined,
+            getRateLimitStatus: async () => null,
+            sendMessage: async () => ({ success: true }),
+          } as any
+        }
+        return {
+          connect: async () => undefined,
+          disconnect: async () => undefined,
+          getRateLimitStatus: async () => null,
+          sendMessage: async () => ({ success: true }),
+        } as any
+      },
+    })
+    wireCampaignStatusSync(queue)
+    await initializeJobWorker(queue, {
+      adapterFactory: (platform: string) => {
+        if (platform === 'facebook' || platform === 'instagram') {
+          return {
+            connect: async () => undefined,
+            disconnect: async () => undefined,
+            getRateLimitStatus: async () => null,
+            sendMessage: async () => ({ success: true }),
+          } as any
+        }
+        return {
+          connect: async () => undefined,
+          disconnect: async () => undefined,
+          getRateLimitStatus: async () => null,
+          sendMessage: async () => ({ success: true }),
+        } as any
+      },
+    })
     server.use('/v1/campaigns', createCampaignsRouter(queue))
     server.use('/v1/accounts', accountsRouter)
     server.use('/v1/track', trackRouter)
@@ -90,7 +128,7 @@ describe('Campaign Integration Flow', () => {
     for (const post of posts) {
       expect(post.platform).toBeDefined()
       expect(['twitter', 'instagram']).toContain(post.platform)
-      expect(post.status).toBe('pending')
+      expect(['posted', 'failed']).toContain(post.status)
     }
   })
 

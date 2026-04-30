@@ -39,6 +39,14 @@ The dashboard contains one page with these sections:
 
 The Facebook blast path uses the same worker queue and repository flow as the other supported platforms. The only difference is the adapter target and the Graph API call format.
 
+When a queued post job completes or fails, the server updates the matching `campaign_posts` row by `job_id` and advances the campaign to `completed` once no posts remain pending.
+
+## Dashboard API base
+
+- The dashboard defaults to `http://127.0.0.1:3456` for API calls.
+- Set `NEXT_PUBLIC_API_BASE` or `NEXT_PUBLIC_API_BASE_URL` if the API runs elsewhere.
+- The dashboard health card should be treated as offline if the configured API base is unreachable.
+
 ## Constraints
 
 - The dashboard does not manage a multi-page navigation structure.

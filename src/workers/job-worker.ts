@@ -112,7 +112,12 @@ export async function initializeJobWorker(queue: JobQueue, options?: WorkerOptio
       const msg = data.message as string
       // Use adapter interface if available; if adapt is missing, skip
       if ((adapter as any).sendMessage) {
-        await (adapter as any).sendMessage(to, msg)
+        const result = await (adapter as any).sendMessage(to, msg)
+        if (result && typeof result === 'object' && result.success === false) {
+          const error = new Error(result.error ?? 'Adapter reported failure')
+          ;(error as any).code = result.code ?? 'ADAPTER_REPORTED_FAILURE'
+          throw error
+        }
         return
       }
       throw new Error('Adapter missing sendMessage implementation')
@@ -121,7 +126,12 @@ export async function initializeJobWorker(queue: JobQueue, options?: WorkerOptio
       const messageId = data.messageId as string
       const text = data.message as string
       if ((adapter as any).replyToMessage) {
-        await (adapter as any).replyToMessage(chatId, messageId, text)
+        const result = await (adapter as any).replyToMessage(chatId, messageId, text)
+        if (result && typeof result === 'object' && result.success === false) {
+          const error = new Error(result.error ?? 'Adapter reported failure')
+          ;(error as any).code = result.code ?? 'ADAPTER_REPORTED_FAILURE'
+          throw error
+        }
         return
       }
       throw new Error('Adapter missing replyToMessage implementation')
