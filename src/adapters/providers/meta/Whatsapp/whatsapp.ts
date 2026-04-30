@@ -1,5 +1,5 @@
-import { IAdapter, RateLimitStatus } from './IAdapter'
-import { getConfig } from '../config/secrets'
+import { IAdapter, RateLimitStatus } from '../../../IAdapter'
+import { getConfig } from '../../../../config/secrets'
 
 type Protocol = 'cloud-api' | 'webjs'
 

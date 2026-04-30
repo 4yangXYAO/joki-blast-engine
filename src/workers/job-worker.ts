@@ -3,16 +3,16 @@ import { IAdapter } from '../adapters/IAdapter'
 import { AccountsRepo } from '../repos/accountsRepo'
 import { decrypt } from '../utils/crypto'
 import { getConfig } from '../config/secrets'
-import { WhatsAppAdapter } from '../adapters/whatsapp'
-import { TelegramAdapter } from '../adapters/telegram'
-import { TelegramMTProtoAdapter } from '../adapters/telegram-mtproto'
-import { InstagramAdapter } from '../adapters/instagram'
-import { InstagramCookieAdapter } from '../adapters/instagram-cookie'
-import { TwitterAdapter } from '../adapters/twitter'
-import { TwitterCookieAdapter } from '../adapters/twitter-cookie'
-import { ThreadsAdapter } from '../adapters/threads'
-import { ThreadsCookieAdapter } from '../adapters/threads-cookie'
-import { FacebookAdapter } from '../adapters/facebook'
+import { WhatsAppAdapter } from '../adapters/providers/meta/Whatsapp/whatsapp'
+import { TelegramAdapter } from '../adapters/providers/telegram/telegram'
+import { TelegramMTProtoAdapter } from '../adapters/providers/telegram/telegram-mtproto'
+import { InstagramAdapter } from '../adapters/providers/meta/instagram/instagram'
+import { InstagramCookieAdapter } from '../adapters/providers/meta/instagram/instagram-cookie'
+import { TwitterAdapter } from '../adapters/providers/twitter/twitter'
+import { TwitterCookieAdapter } from '../adapters/providers/twitter/twitter-cookie'
+import { ThreadsAdapter } from '../adapters/providers/meta/threads/threads'
+import { ThreadsCookieAdapter } from '../adapters/providers/meta/threads/threads-cookie'
+import { FacebookAdapter } from '../adapters/providers/meta/facebook/facebook'
 // (Types not strictly required here; jobs are routed via the generic payload in queue processor)
 
 // In this worker, we route jobs to platform adapters based on the job.platform field.
@@ -114,10 +114,12 @@ export async function initializeJobWorker(queue: JobQueue, options?: WorkerOptio
       if ((adapter as any).sendMessage) {
         const result = await (adapter as any).sendMessage(to, msg)
         if (result && typeof result === 'object' && result.success === false) {
+          console.log(`[worker] ${platform} adapter failed: ${result.code} - ${result.error}`)
           const error = new Error(result.error ?? 'Adapter reported failure')
           ;(error as any).code = result.code ?? 'ADAPTER_REPORTED_FAILURE'
           throw error
         }
+        console.log(`[worker] ${platform} adapter succeeded for job ${id}`)
         return
       }
       throw new Error('Adapter missing sendMessage implementation')

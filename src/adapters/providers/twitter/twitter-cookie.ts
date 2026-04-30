@@ -1,5 +1,5 @@
-import type { IAdapter, RateLimitStatus } from './IAdapter';
-import { createHttpClient, parseCookies } from '../utils/http-client';
+import type { IAdapter, RateLimitStatus } from '../../IAdapter'
+import { createHttpClient, parseCookies } from '../../../utils/http-client'
 
 /**
  * TwitterCookieAdapter
@@ -10,31 +10,36 @@ import { createHttpClient, parseCookies } from '../utils/http-client';
  * IMPORTANT: Ensure you are compliant with Twitter/X's Terms of Service.
  */
 export class TwitterCookieAdapter implements IAdapter {
-  private cookieHeader: string = '';
-  private csrfToken: string = '';
-  private logger?: (msg: string) => void;
-  private rateRemaining = 50;
-  private rateReset = Date.now() + 60_000;
+  private cookieHeader: string = ''
+  private csrfToken: string = ''
+  private logger?: (msg: string) => void
+  private rateRemaining = 50
+  private rateReset = Date.now() + 60_000
 
-  constructor(private rawCookie: string, opts?: { logger?: (msg: string) => void }) {
-    this.logger = opts?.logger;
+  constructor(
+    private rawCookie: string,
+    opts?: { logger?: (msg: string) => void }
+  ) {
+    this.logger = opts?.logger
   }
 
-  private log(msg: string) { this.logger?.(`[TwitterCookie] ${msg}`); }
+  private log(msg: string) {
+    this.logger?.(`[TwitterCookie] ${msg}`)
+  }
 
   async connect(): Promise<void> {
-    if (!this.rawCookie) throw new Error('Twitter cookie not provided');
-    this.cookieHeader = parseCookies(this.rawCookie);
+    if (!this.rawCookie) throw new Error('Twitter cookie not provided')
+    this.cookieHeader = parseCookies(this.rawCookie)
     // ct0 is the CSRF token cookie for Twitter
-    const match = this.cookieHeader.match(/ct0=([^;]+)/);
-    this.csrfToken = match?.[1] ?? '';
-    this.log('Cookie loaded');
+    const match = this.cookieHeader.match(/ct0=([^;]+)/)
+    this.csrfToken = match?.[1] ?? ''
+    this.log('Cookie loaded')
   }
 
   async disconnect(): Promise<void> {
-    this.cookieHeader = '';
-    this.csrfToken = '';
-    this.log('Disconnected');
+    this.cookieHeader = ''
+    this.csrfToken = ''
+    this.log('Disconnected')
   }
 
   /**
@@ -42,11 +47,14 @@ export class TwitterCookieAdapter implements IAdapter {
    * @param _to   Unused (tweets go to authenticated user's timeline)
    * @param message  Tweet text (max 280 chars enforced server-side)
    */
-  async sendMessage(_to: string, message: string): Promise<{ success: boolean; error?: string; code?: string }> {
-    if (!this.cookieHeader) await this.connect();
-    this.maybeDrainRate();
+  async sendMessage(
+    _to: string,
+    message: string
+  ): Promise<{ success: boolean; error?: string; code?: string }> {
+    if (!this.cookieHeader) await this.connect()
+    this.maybeDrainRate()
     if (this.rateRemaining <= 0) {
-      return { success: false, code: 'RATE_LIMIT_EXCEEDED', error: 'Rate limit exceeded' };
+      return { success: false, code: 'RATE_LIMIT_EXCEEDED', error: 'Rate limit exceeded' }
     }
     try {
       const client = createHttpClient({
@@ -55,13 +63,15 @@ export class TwitterCookieAdapter implements IAdapter {
         headers: {
           Cookie: this.cookieHeader,
           'X-Csrf-Token': this.csrfToken,
-          Authorization: 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA',
+          Authorization:
+            'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA',
           'Content-Type': 'application/json',
           'X-Twitter-Active-User': 'yes',
           'X-Twitter-Auth-Type': 'OAuth2Session',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
         },
-      });
+      })
       const body = {
         variables: {
           tweet_text: message,
@@ -89,14 +99,18 @@ export class TwitterCookieAdapter implements IAdapter {
           responsive_web_enhance_cards_enabled: false,
         },
         queryId: 'SoVnbfCycZ7fERGCwpZkYA',
-      };
-      const res = await client.post('/i/api/graphql/SoVnbfCycZ7fERGCwpZkYA/CreateTweet', body);
-      const tweetId = res?.data?.data?.create_tweet?.tweet_results?.result?.rest_id;
-      const ok = !!tweetId;
-      this.log(`Tweet result: ${tweetId ?? 'none'}`);
-      return { success: ok, code: ok ? undefined : 'TWITTER_COOKIE_POST_ERROR' };
+      }
+      const res = await client.post('/i/api/graphql/SoVnbfCycZ7fERGCwpZkYA/CreateTweet', body)
+      const tweetId = res?.data?.data?.create_tweet?.tweet_results?.result?.rest_id
+      const ok = !!tweetId
+      this.log(`Tweet result: ${tweetId ?? 'none'}`)
+      return { success: ok, code: ok ? undefined : 'TWITTER_COOKIE_POST_ERROR' }
     } catch (e: any) {
-      return { success: false, error: e?.message ?? 'Twitter cookie post error', code: 'TWITTER_COOKIE_POST_ERROR' };
+      return {
+        success: false,
+        error: e?.message ?? 'Twitter cookie post error',
+        code: 'TWITTER_COOKIE_POST_ERROR',
+      }
     }
   }
 
@@ -105,11 +119,14 @@ export class TwitterCookieAdapter implements IAdapter {
    * @param to  Tweet ID to reply to
    * @param message  Reply text
    */
-  async replyToMessage(to: string, message: string): Promise<{ success: boolean; error?: string; code?: string }> {
-    if (!this.cookieHeader) await this.connect();
-    this.maybeDrainRate();
+  async replyToMessage(
+    to: string,
+    message: string
+  ): Promise<{ success: boolean; error?: string; code?: string }> {
+    if (!this.cookieHeader) await this.connect()
+    this.maybeDrainRate()
     if (this.rateRemaining <= 0) {
-      return { success: false, code: 'RATE_LIMIT_EXCEEDED', error: 'Rate limit exceeded' };
+      return { success: false, code: 'RATE_LIMIT_EXCEEDED', error: 'Rate limit exceeded' }
     }
     try {
       const client = createHttpClient({
@@ -118,13 +135,15 @@ export class TwitterCookieAdapter implements IAdapter {
         headers: {
           Cookie: this.cookieHeader,
           'X-Csrf-Token': this.csrfToken,
-          Authorization: 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA',
+          Authorization:
+            'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA',
           'Content-Type': 'application/json',
           'X-Twitter-Active-User': 'yes',
           'X-Twitter-Auth-Type': 'OAuth2Session',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
         },
-      });
+      })
       const body = {
         variables: {
           tweet_text: message,
@@ -153,26 +172,33 @@ export class TwitterCookieAdapter implements IAdapter {
           responsive_web_enhance_cards_enabled: false,
         },
         queryId: 'SoVnbfCycZ7fERGCwpZkYA',
-      };
-      const res = await client.post('/i/api/graphql/SoVnbfCycZ7fERGCwpZkYA/CreateTweet', body);
-      const tweetId = res?.data?.data?.create_tweet?.tweet_results?.result?.rest_id;
-      const ok = !!tweetId;
-      this.log(`Reply tweet result: ${tweetId ?? 'none'}`);
-      return { success: ok, code: ok ? undefined : 'TWITTER_COOKIE_REPLY_ERROR' };
+      }
+      const res = await client.post('/i/api/graphql/SoVnbfCycZ7fERGCwpZkYA/CreateTweet', body)
+      const tweetId = res?.data?.data?.create_tweet?.tweet_results?.result?.rest_id
+      const ok = !!tweetId
+      this.log(`Reply tweet result: ${tweetId ?? 'none'}`)
+      return { success: ok, code: ok ? undefined : 'TWITTER_COOKIE_REPLY_ERROR' }
     } catch (e: any) {
-      return { success: false, error: e?.message ?? 'Twitter cookie reply error', code: 'TWITTER_COOKIE_REPLY_ERROR' };
+      return {
+        success: false,
+        error: e?.message ?? 'Twitter cookie reply error',
+        code: 'TWITTER_COOKIE_REPLY_ERROR',
+      }
     }
   }
 
   async getRateLimitStatus(): Promise<RateLimitStatus | null> {
-    return { limit: 50, remaining: this.rateRemaining, reset: this.rateReset };
+    return { limit: 50, remaining: this.rateRemaining, reset: this.rateReset }
   }
 
   private maybeDrainRate() {
-    const now = Date.now();
-    if (now > this.rateReset) { this.rateRemaining = 50; this.rateReset = now + 60_000; }
-    if (this.rateRemaining > 0) this.rateRemaining--;
+    const now = Date.now()
+    if (now > this.rateReset) {
+      this.rateRemaining = 50
+      this.rateReset = now + 60_000
+    }
+    if (this.rateRemaining > 0) this.rateRemaining--
   }
 }
 
-export default TwitterCookieAdapter;
+export default TwitterCookieAdapter

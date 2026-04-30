@@ -6,6 +6,7 @@ Production-focused Node.js/TypeScript blast engine with a Next.js dashboard, SQL
 
 - **Campaign Management**: Create marketing campaigns targeting multiple social platforms (Twitter, Threads, Instagram, Facebook).
 - **Link Tracking**: Generate deterministic tracking tokens per campaign/platform and record click statistics.
+- **Destination Links**: Resolve traffic correctly to WhatsApp, Telegram, or webshop destinations.
 - **Inbound Auto-Reply**: Receive messages on WhatsApp/Telegram and send deterministic welcome message, then hand off to sales.
 - **Blast Engine**: Post content to multiple platforms simultaneously with exponential backoff retry and platform-specific rate limiting.
 - **Facebook Pages**: Publish page posts through the official Graph API v19.0 with Page access tokens.
@@ -49,7 +50,7 @@ Production-focused Node.js/TypeScript blast engine with a Next.js dashboard, SQL
 1. After campaign created, click **Blast Campaign**
 2. System enqueues one PostJob per selected platform
 3. Each job includes a unique tracking link per platform
-4. Jobs are processed with exponential backoff retry (max 5 retries)
+4. Jobs are processed with exponential backoff retry (Facebook uses up to 50 retries)
 
 ### 3. Track Link Clicks
 
@@ -179,6 +180,14 @@ Useful integration variables:
 - Backend tests: `npm test`
 - Dashboard build: `npm --prefix dashboard run build`
 - Config validation: `npm run validate:config`
+
+## Validation Checklist
+
+- Campaign can be created and triggered from the UI.
+- Links resolve correctly to WhatsApp, Telegram, or webshop destinations.
+- Auto-reply welcome is sent on inbound WhatsApp/Telegram messages.
+- Manual negotiation handoff is visible in system state.
+- Backend tests and dashboard build are green.
 
 ## Notes
 

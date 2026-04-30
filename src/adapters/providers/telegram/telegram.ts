@@ -1,4 +1,4 @@
-import type { IAdapter, RateLimitStatus } from './IAdapter'
+import type { IAdapter, RateLimitStatus } from '../../IAdapter'
 
 // Telegram Adapter using telegraf (lazy require to avoid runtime hard dependency in tests)
 export class TelegramAdapter implements IAdapter {
@@ -28,7 +28,10 @@ export class TelegramAdapter implements IAdapter {
     }
   }
 
-  async sendMessage(to: string, message: string): Promise<{ success: boolean; error?: string; code?: string }> {
+  async sendMessage(
+    to: string,
+    message: string
+  ): Promise<{ success: boolean; error?: string; code?: string }> {
     if (!this.bot) {
       await this.connect()
     }
@@ -44,12 +47,19 @@ export class TelegramAdapter implements IAdapter {
   }
 
   // Compatibility alias for plan: postMessage
-  async postMessage(to: string, message: string): Promise<{ success: boolean; error?: string; code?: string }> {
+  async postMessage(
+    to: string,
+    message: string
+  ): Promise<{ success: boolean; error?: string; code?: string }> {
     return this.sendMessage(to, message)
   }
 
   // Reply to a specific message in a chat
-  async replyToMessage(chatId: string, messageId: number, text: string): Promise<{ success: boolean; error?: string; code?: string }> {
+  async replyToMessage(
+    chatId: string,
+    messageId: number,
+    text: string
+  ): Promise<{ success: boolean; error?: string; code?: string }> {
     if (!this.bot) {
       await this.connect()
     }

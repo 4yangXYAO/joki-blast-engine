@@ -118,14 +118,16 @@ Endpoint cek lead:
 Hasil yang benar:
 - Status lead terlihat jelas di data.
 
-## 7) Status saat ini (berdasarkan pengujian yang sudah dilakukan)
+## 7) Checklist akhir
 
-Yang sudah beres:
-- Phase 1 sampai Phase 5 selesai.
-- Test backend + integration lulus.
-- Dashboard build lulus.
+Kalau mau menyatakan fitur ini sudah siap dipakai, pastikan:
+- Campaign bisa dibuat dan di-blast dari dashboard.
+- Link resolve dengan benar ke WA/Telegram/webshop.
+- Auto-reply welcome terkirim saat inbound WA/Telegram message.
+- Manual negotiation handoff terlihat di system state.
+- Backend tests dan dashboard build hijau.
 
-Yang biasanya belum 100% final:
+Yang tetap perlu dicek di dunia nyata:
 - Uji live pakai kredensial platform asli.
 - Browser validation end-to-end dengan skenario real.
 
@@ -156,5 +158,5 @@ Webhook inbound:
 
 ## 10) Kesimpulan super singkat
 
-Project ini sudah siap dipakai untuk alur blast + tracking + auto-reply + handoff manual.
-Untuk menyatakan "100% live-ready", tinggal final check dengan akun platform asli dan uji browser end-to-end real scenario.
+Project ini fokus ke alur blast + tracking + auto-reply + handoff manual.
+Target akhirnya adalah memastikan checklist akhir di atas lolos dengan akun platform asli dan uji browser end-to-end real scenario.
