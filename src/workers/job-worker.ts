@@ -110,17 +110,48 @@ export async function initializeJobWorker(queue: JobQueue, options?: WorkerOptio
     if (data.type === 'PostJob') {
       const to = (data.to as string) || data.account_id
       const msg = data.message as string
-      // Use adapter interface if available; if adapt is missing, skip
+      // Use adapter interface if available; if adapter missing, skip
       if ((adapter as any).sendMessage) {
-        const result = await (adapter as any).sendMessage(to, msg)
-        if (result && typeof result === 'object' && result.success === false) {
-          console.log(`[worker] ${platform} adapter failed: ${result.code} - ${result.error}`)
-          const error = new Error(result.error ?? 'Adapter reported failure')
-          ;(error as any).code = result.code ?? 'ADAPTER_REPORTED_FAILURE'
-          throw error
+        try {
+          const result = await (adapter as any).sendMessage(to, msg)
+          if (result && typeof result === 'object' && result.success === false) {
+            console.log(`[worker] ${platform} adapter failed: ${result.code} - ${result.error}`)
+            // Persist failure to logs table for observability
+            try {
+              const { getDb } = await import('../db/sqlite')
+              const db = getDb()
+              db.prepare(`INSERT INTO logs (job_id, level, message, meta) VALUES (?, ?, ?, ?)`).run(
+                id,
+                'error',
+                String(result.error ?? 'Adapter reported failure'),
+                JSON.stringify({ code: result.code })
+              )
+            } catch (err) {
+              console.error('Failed to persist job failure log', err)
+            }
+            const error = new Error(result.error ?? 'Adapter reported failure')
+            ;(error as any).code = result.code ?? 'ADAPTER_REPORTED_FAILURE'
+            throw error
+          }
+          console.log(`[worker] ${platform} adapter succeeded for job ${id}`)
+          return
+        } catch (err: any) {
+          // On unexpected error, persist stack and message then rethrow for retry logic
+          try {
+            const { getDb } = await import('../db/sqlite')
+            const db = getDb()
+            db.prepare(`INSERT INTO logs (job_id, level, message, meta) VALUES (?, ?, ?, ?)`).run(
+              id,
+              'error',
+              String(err?.message ?? 'worker error'),
+              JSON.stringify({ stack: err?.stack ?? null, code: err?.code ?? null })
+            )
+          } catch (err2) {
+            console.error('Failed to persist worker error log', err2)
+          }
+          console.error('[worker] adapter exception', err)
+          throw err
         }
-        console.log(`[worker] ${platform} adapter succeeded for job ${id}`)
-        return
       }
       throw new Error('Adapter missing sendMessage implementation')
     } else if (data.type === 'ReplyJob') {

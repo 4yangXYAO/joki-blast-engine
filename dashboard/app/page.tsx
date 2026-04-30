@@ -165,6 +165,14 @@ export default function Page() {
     void load()
   }, [])
 
+  // Auto-refresh collections periodically so dashboard updates without manual reload
+  useEffect(() => {
+    const id = setInterval(() => {
+      void refreshCollections()
+    }, 10000)
+    return () => clearInterval(id)
+  }, [])
+
   async function refreshCollections() {
     try {
       const [accountsResponse, templatesResponse, campaignsResponse] = await Promise.all([

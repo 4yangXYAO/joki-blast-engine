@@ -39,6 +39,14 @@ The dashboard contains one page with these sections:
 
 The Facebook blast path uses the same worker queue and repository flow as the other supported platforms. The only difference is the adapter target and the Graph API call format.
 
+### Cookie-based adapters
+
+- Several adapters offer a cookie-based delivery path (Instagram, Facebook mobile, Threads, Twitter cookie path). These adapters accept a browser session cookie string or JSON cookie array and perform mobile-site scraping to extract CSRF tokens (e.g., `fb_dtsg`) and account identifiers. Use these paths only when official API tokens are unavailable. The backend records adapter errors to the `logs` table for troubleshooting.
+
+### SQLite and concurrency
+
+- The SQLite initialization sets `journal_mode = WAL` and `busy_timeout = 30000` to reduce contention under concurrent worker and API access.
+
 When a queued post job completes or fails, the server updates the matching `campaign_posts` row by `job_id` and advances the campaign to `completed` once no posts remain pending.
 
 ## Dashboard API base

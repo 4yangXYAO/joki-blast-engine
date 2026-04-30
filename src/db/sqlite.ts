@@ -28,6 +28,8 @@ export function initDatabase(dbPath: string): DB {
   _isSqlJs = false
   try {
     _db.pragma('journal_mode = WAL')
+    // Increase busy timeout to reduce SQLITE_BUSY occurrences under contention
+    _db.pragma('busy_timeout = 30000')
     _db.pragma('foreign_keys = ON')
   } catch (err) {
     console.warn('sqlite: failed applying pragmas', err)

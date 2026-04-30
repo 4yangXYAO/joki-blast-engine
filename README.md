@@ -157,6 +157,13 @@ Useful integration variables:
 - `INSTAGRAM_ALLOW_PRIVATE_API`
 - `WHATSAPP_WEBJS_API_KEY`
 
+Cookie-based adapters (Facebook/Instagram/Threads/Twitter cookie paths)
+---------------------------------------------------------------
+
+- Some adapters support posting using browser session cookies instead of official platform tokens. This is "advanced" behaviour and requires a valid browser session cookie string (e.g. `c_user=...; xs=...; datr=...;`) or an exported cookie JSON array.
+- For Facebook cookie posting the adapter will extract `fb_dtsg`, `lst`, and `c_user` from the mobile site (`https://m.facebook.com/`) and submit a mobile form endpoint. If Facebook redirects to login, the adapter will report an `AUTH_EXPIRED` error.
+- Storing cookies in the dashboard `Accounts` section is allowed; credentials are encrypted at rest. Use cookies responsibly and ensure you comply with platform Terms of Service.
+
 ## API routes
 
 - `GET /v1/health`
