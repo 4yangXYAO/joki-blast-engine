@@ -1,4 +1,4 @@
-﻿import express, { Router } from 'express'
+import express, { Router } from 'express'
 import { JobQueue } from '../queue/job-queue'
 import {
   createSchedule,
@@ -10,6 +10,8 @@ import {
   schedules,
 } from '../scheduler/cron-scheduler'
 import { JobsRepo } from '../repos/jobsRepo'
+import { AccountsRepo } from '../repos/accountsRepo'
+import { getRandomTargets } from '../utils/randomTargets'
 
 // Do not initialize DB during import. Provide lazy access to JobsRepo so tests
 // and setup code can initialize DB first.
@@ -20,7 +22,7 @@ export function getJobsRepo(db?: any) {
   return jobsRepo
 }
 
-export type QueueLike = Pick<JobQueue, 'enqueuePostJob'>
+export type QueueLike = Pick<JobQueue, 'enqueuePostJob' | 'enqueueCommentJob' | 'enqueueChatJob'>
 
 export function createJobsRouter(queue: QueueLike) {
   const router = Router()
@@ -56,6 +58,81 @@ export function createJobsRouter(queue: QueueLike) {
       message: message || `Trigger template ${template_id}`,
     } as any)
     res.status(202).json({ job_id: jobId })
+  })
+
+  /**
+   * POST /v1/jobs/comment-random
+   * Body: { message: string, accountId: string, count?: number }
+   *
+   * Reads data/targets.txt (post IDs), picks `count` random targets (default 50),
+   * enqueues a CommentJob for each, and returns the array of job IDs.
+   *
+   * The account must be a Facebook account (platform = 'facebook' or 'facebook-page').
+   */
+  router.post('/comment-random', async (req, res) => {
+    const { message, accountId, count } = req.body || {}
+
+    if (!message || typeof message !== 'string' || !message.trim()) {
+      return res.status(400).json({ error: 'message is required' })
+    }
+    if (!accountId || typeof accountId !== 'string') {
+      return res.status(400).json({ error: 'accountId is required' })
+    }
+
+    // Validate account exists and is Facebook
+    let account: any = null
+    try {
+      const accountsRepo = new AccountsRepo()
+      account = accountsRepo.findById(accountId)
+    } catch {
+      return res.status(500).json({ error: 'Failed to look up account' })
+    }
+
+    if (!account) {
+      return res.status(404).json({ error: `Account not found: ${accountId}` })
+    }
+    const platformValue: string = String(account.platform ?? '')
+    if (!platformValue.startsWith('facebook')) {
+      return res.status(400).json({
+        error: `Account platform must be 'facebook' or 'facebook-page', got: ${platformValue}`,
+      })
+    }
+
+    // Load random targets
+    const targetCount = typeof count === 'number' && count > 0 ? Math.min(count, 200) : 50
+    const targets = getRandomTargets(targetCount)
+
+    if (targets.length === 0) {
+      return res.status(422).json({
+        error:
+          'No targets available. Fill data/targets.txt with post IDs (one per line) and try again.',
+      })
+    }
+
+    // Enqueue one CommentJob per target
+    const jobIds: string[] = []
+    const errors: string[] = []
+
+    for (const postId of targets) {
+      try {
+        const jobId = await queue.enqueueCommentJob({
+          platform: 'facebook',
+          postId,
+          message: message.trim(),
+          account_id: accountId,
+        } as any)
+        jobIds.push(jobId)
+      } catch (e: any) {
+        errors.push(`Failed to enqueue for postId=${postId}: ${e?.message}`)
+      }
+    }
+
+    return res.status(202).json({
+      enqueued: jobIds.length,
+      job_ids: jobIds,
+      targets_found: targets.length,
+      errors: errors.length > 0 ? errors : undefined,
+    })
   })
 
   return router

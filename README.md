@@ -2,6 +2,11 @@
 
 Production-focused Node.js/TypeScript blast engine with a Next.js dashboard, SQLite persistence, and platform adapters for WhatsApp, Telegram, Instagram, Twitter/X, Threads, and Facebook Pages.
 
+## Runtime
+
+- Node.js `20.20.x` is the supported version for local development in this workspace.
+- If native modules such as `better-sqlite3` were installed under a different Node version, reinstall dependencies after switching Node.
+
 ## What works now
 
 - **Campaign Management**: Create marketing campaigns targeting multiple social platforms (Twitter, Threads, Instagram, Facebook).
@@ -17,18 +22,19 @@ Production-focused Node.js/TypeScript blast engine with a Next.js dashboard, SQL
 - Store integration tokens and credentials encrypted in SQLite.
 - WhatsApp via WAHA is configured through runtime settings or `.env`.
 
-## Facebook Pages Blast
+## Facebook Blast
 
-- The supported Facebook blast path is Pages posting through the Graph API v19.0.
-- The credential payload must contain `pageId` and `accessToken`.
-- Rate limit errors are mapped to a deterministic adapter code.
-- Expired token errors are mapped to a deterministic adapter code.
-- This repository does not implement browser-cookie automation for Facebook groups or forums.
+- Facebook blast uses **cookie-based auth** via the `m.facebook.com` mobile endpoint.
+- Credential: raw browser session cookie string (`c_user=...; xs=...; datr=...`).
+- No developer app, no Page Access Token required.
+- Cookie is stored encrypted in SQLite (AES-256-GCM).
+- Rate limit errors map to `RATE_LIMIT_EXCEEDED` code.
+- Expired cookie errors map to `AUTH_EXPIRED` code.
 
 **See [FACEBOOK_PAGES_BLAST.md](docs/FACEBOOK_PAGES_BLAST.md) for a complete step-by-step guide on how to:**
 
-- Get Facebook Page ID and Access Token
-- Create a Facebook Page account in the dashboard
+- Get your Facebook session cookie from a logged-in browser
+- Create a Facebook account in the dashboard
 - Create and blast campaigns to Facebook
 - Handle errors and troubleshoot issues
 
@@ -65,6 +71,56 @@ Production-focused Node.js/TypeScript blast engine with a Next.js dashboard, SQL
   2. Sends deterministic welcome message ("Halo! Terima kasih sudah menghubungi kami...")
   3. Marks lead as "awaiting_handoff" for manual sales negotiation
   4. Prevents duplicate welcome messages via idempotent lead storage
+
+### 5. Facebook Mass Comment Blast
+
+Comments are posted to random Facebook post IDs loaded from `data/targets.txt`.
+
+**Setup `data/targets.txt`:**
+
+```
+# One Facebook post ID per line (format: userId_postId  OR  just postId)
+561234567890_123456789012345
+100012345678901_987654321
+```
+
+**Trigger mass comment blast:**
+
+```http
+POST /v1/jobs/comment-random
+Content-Type: application/json
+
+{
+  "message": "Produk bagus! DM kami untuk info harga 📩",
+  "accountId": "your-facebook-account-id",
+  "count": 50
+}
+```
+
+Response:
+
+```json
+{ "enqueued": 50, "job_ids": ["job-...", "..."], "targets_found": 50 }
+```
+
+### 6. Facebook Private Message (DM)
+
+Send direct Messenger messages via the job queue:
+
+```http
+POST /v1/jobs/trigger
+Content-Type: application/json
+
+{
+  "template_id": "...",
+  "account_id": "your-facebook-account-id",
+  "platform": "facebook",
+  "message": "Halo! Ada penawaran spesial untuk kamu 🎉"
+}
+```
+
+For DM jobs, use `ChatJob` type which calls `sendPrivateMessage(userId, message, cookie)` on the
+`facebook` adapter. The `to` field in the job payload should be the target user's numeric Facebook ID.
 
 ## Getting Started
 

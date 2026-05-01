@@ -1,5 +1,6 @@
-﻿import { EventEmitter } from 'events'
-import { PostJob, ReplyJob, Job } from '../types/jobs'
+import { EventEmitter } from 'events'
+import { Mutex } from 'async-mutex'
+import { PostJob, ReplyJob, CommentJob, ChatJob, Job } from '../types/jobs'
 import type { IAdapter } from '../adapters/IAdapter'
 import { computeBackoffDelay, getRetryMaxAttemptsForError, isRetryableError } from './retry'
 import { getPolicyForPlatform } from './retry-policies'
@@ -9,6 +10,7 @@ import { RateLimiter } from './rate-limiter'
 // - In-memory processing (fallback when BullMQ is unavailable)
 // - Optional adapterFactory to inject mocks during tests
 // - Emits "completed" and "failed" events with jobId and result/error
+// - Uses Mutex to ensure atomic processNext() execution (FIX #2)
 
 type AdapterFactory = (platform: string) => IAdapter
 
@@ -17,7 +19,7 @@ export class JobQueue extends EventEmitter {
   private useBullMQ: boolean = false
   private queueName: string = 'job-queue'
   private inMemoryQueue: Array<{ id: string; data: any; type: string; attempts: number }> = []
-  private inFlight: boolean = false
+  private processingMutex = new Mutex() // ✅ FIX #2: Atomic lock instead of boolean
   private processor?: (payload: { id: string; data: any }) => Promise<void>
   private adapterFactory: AdapterFactory
   public dlq: Array<{ id: string; error: any; data: any }> = []
@@ -94,74 +96,108 @@ export class JobQueue extends EventEmitter {
     return id
   }
 
+  // Enqueue a CommentJob (Facebook comment on a post)
+  async enqueueCommentJob(
+    job: Omit<CommentJob, 'id' | 'type'> & { platform: string }
+  ): Promise<string> {
+    const id = `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const data = { ...job, type: 'CommentJob' }
+    console.debug(
+      `[JobQueue] Enqueue CommentJob id=${id} platform=${job.platform} postId=${(job as any).postId}`
+    )
+    this.inMemoryQueue.push({ id, data, type: 'CommentJob', attempts: 0 })
+    if (this.processor) {
+      this.processNext()
+    } else {
+      setTimeout(() => this.processNext(), 0)
+    }
+    return id
+  }
+
+  // Enqueue a ChatJob (Facebook Messenger DM)
+  async enqueueChatJob(job: Omit<ChatJob, 'id' | 'type'> & { platform: string }): Promise<string> {
+    const id = `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const data = { ...job, type: 'ChatJob' }
+    console.debug(
+      `[JobQueue] Enqueue ChatJob id=${id} platform=${job.platform} userId=${(job as any).userId}`
+    )
+    this.inMemoryQueue.push({ id, data, type: 'ChatJob', attempts: 0 })
+    if (this.processor) {
+      this.processNext()
+    } else {
+      setTimeout(() => this.processNext(), 0)
+    }
+    return id
+  }
+
   private async processNext() {
-    if (this.inFlight) return
-    this.inFlight = true
-    // Diagnostic
-    // eslint-disable-next-line no-console
-    console.debug('[JobQueue] processNext started. Queue size:', this.inMemoryQueue.length)
-    try {
-      // Process all queued items in-order
-      while (this.inMemoryQueue.length > 0) {
-        const item = this.inMemoryQueue.shift()!
-        const platform = item.data?.platform || 'default'
-
-        // Wait for rate limit token before processing
-        await this.rateLimiter.waitForToken(platform)
-
-        if (!this.processor) {
-          // No processor registered; skip
-          // Diagnostic
-          // eslint-disable-next-line no-console
-          console.warn('[JobQueue] No processor registered; skipping item', item?.id)
-          continue
-        }
-        try {
-          await this.processor({ id: item.id, data: item.data })
-          this.emit('completed', item.id, item.data)
-        } catch (err: any) {
-          const policy = getPolicyForPlatform(platform)
-          const retryLimit = getRetryMaxAttemptsForError(err)
-          const attempts = item.attempts
-
-          // Check for 429 Retry-After header
-          if (err?.response?.status === 429) {
-            const retryAfter = parseInt(err.response.headers?.['retry-after'] || '60', 10)
-            console.debug(
-              `[JobQueue] 429 Rate Limit hit for ${platform}. Blocking for ${retryAfter}s`
-            )
-            this.rateLimiter.blockFor(platform, retryAfter)
-          }
-
-          if (isRetryableError(err) && attempts < retryLimit) {
-            const delay = computeBackoffDelay(
-              policy.baseDelay,
-              policy.multiplier,
-              attempts,
-              policy.jitter
-            )
-            const nextItem = { ...item, attempts: attempts + 1 }
-            console.debug(
-              `[JobQueue] Retrying job ${item.id} in ${delay}ms (attempt ${attempts + 1})`
-            )
-            setTimeout(() => {
-              this.inMemoryQueue.push(nextItem)
-              this.processNext()
-            }, delay)
-            // Since we use setTimeout for retry, we continue processing other items in the queue
-            continue
-          } else {
-            this.dlq.push({ id: item.id, error: err, data: item.data })
-            this.emit('failed', item.id, err)
-          }
-        }
-      }
-    } finally {
-      this.inFlight = false
+    // ✅ FIX #2: Use Mutex to ensure atomic execution (prevent race condition)
+    await this.processingMutex.runExclusive(async () => {
       // Diagnostic
       // eslint-disable-next-line no-console
-      console.debug('[JobQueue] processNext finished. InFlight reset.')
-    }
+      console.debug('[JobQueue] processNext started. Queue size:', this.inMemoryQueue.length)
+      try {
+        // Process all queued items in-order
+        while (this.inMemoryQueue.length > 0) {
+          const item = this.inMemoryQueue.shift()!
+          const platform = item.data?.platform || 'default'
+
+          // Wait for rate limit token before processing
+          await this.rateLimiter.waitForToken(platform)
+
+          if (!this.processor) {
+            // No processor registered; skip
+            // Diagnostic
+            // eslint-disable-next-line no-console
+            console.warn('[JobQueue] No processor registered; skipping item', item?.id)
+            continue
+          }
+          try {
+            await this.processor({ id: item.id, data: item.data })
+            this.emit('completed', item.id, item.data)
+          } catch (err: any) {
+            const policy = getPolicyForPlatform(platform)
+            const retryLimit = getRetryMaxAttemptsForError(err)
+            const attempts = item.attempts
+
+            // Check for 429 Retry-After header
+            if (err?.response?.status === 429) {
+              const retryAfter = parseInt(err.response.headers?.['retry-after'] || '60', 10)
+              console.debug(
+                `[JobQueue] 429 Rate Limit hit for ${platform}. Blocking for ${retryAfter}s`
+              )
+              this.rateLimiter.blockFor(platform, retryAfter)
+            }
+
+            if (isRetryableError(err) && attempts < retryLimit) {
+              const delay = computeBackoffDelay(
+                policy.baseDelay,
+                policy.multiplier,
+                attempts,
+                policy.jitter
+              )
+              const nextItem = { ...item, attempts: attempts + 1 }
+              console.debug(
+                `[JobQueue] Retrying job ${item.id} in ${delay}ms (attempt ${attempts + 1})`
+              )
+              setTimeout(() => {
+                this.inMemoryQueue.push(nextItem)
+                this.processNext()
+              }, delay)
+              // Since we use setTimeout for retry, we continue processing other items in the queue
+              continue
+            } else {
+              this.dlq.push({ id: item.id, error: err, data: item.data })
+              this.emit('failed', item.id, err)
+            }
+          }
+        }
+      } finally {
+        // Diagnostic
+        // eslint-disable-next-line no-console
+        console.debug('[JobQueue] processNext finished.')
+      }
+    })
   }
 }
 

@@ -13,7 +13,8 @@ import { TwitterCookieAdapter } from '../adapters/providers/twitter/twitter-cook
 import { ThreadsAdapter } from '../adapters/providers/meta/threads/threads'
 import { ThreadsCookieAdapter } from '../adapters/providers/meta/threads/threads-cookie'
 import { FacebookAdapter } from '../adapters/providers/meta/facebook/facebook'
-// (Types not strictly required here; jobs are routed via the generic payload in queue processor)
+import { postComment } from '../adapters/providers/meta/facebook/comment'
+import { sendPrivateMessage } from '../adapters/providers/meta/facebook/chat'
 
 // In this worker, we route jobs to platform adapters based on the job.platform field.
 // The worker is intentionally DI-friendly: tests can supply a custom adapterFactory
@@ -98,6 +99,8 @@ function createDefaultAdapterFactory() {
 
 export async function initializeJobWorker(queue: JobQueue, options?: WorkerOptions) {
   const adaptersFactory = options?.adapterFactory ?? createDefaultAdapterFactory()
+  // Shared repo used to resolve credentials in CommentJob / ChatJob handlers
+  const workerAccountsRepo = new AccountsRepo()
 
   // Processor that uses platform adapters to deliver messages
   queue.setProcessor(async ({ id, data }: { id: string; data: any }) => {
@@ -168,9 +171,56 @@ export async function initializeJobWorker(queue: JobQueue, options?: WorkerOptio
         return
       }
       throw new Error('Adapter missing replyToMessage implementation')
+    } else if (data.type === 'CommentJob') {
+      // Facebook comment on a post — uses standalone postComment() function
+      const postId = data.postId as string
+      const text = data.message as string
+      if (!postId) throw new Error('CommentJob missing postId')
+      const account = data.account_id ? workerAccountsRepo.findById(data.account_id) : null
+      const rawCreds = readDecryptedCredentials(account?.credentials_encrypted)
+      if (!rawCreds) throw new Error('CommentJob: no credentials for account')
+      const result = await postComment(postId, text, rawCreds)
+      if (!result.success) {
+        const error = new Error(result.error ?? 'postComment failed')
+        ;(error as any).code = 'COMMENT_FAILED'
+        try {
+          const { getDb } = await import('../db/sqlite')
+          const db = getDb()
+          db.prepare(`INSERT INTO logs (job_id, level, message, meta) VALUES (?, ?, ?, ?)`).run(
+            id, 'error', String(result.error ?? 'postComment failed'), JSON.stringify({ postId })
+          )
+        } catch { /* non-fatal */ }
+        throw error
+      }
+      console.log(`[worker] Facebook comment posted for job ${id} on post ${postId}`)
+      return
+    } else if (data.type === 'ChatJob') {
+      // Facebook Messenger DM — uses standalone sendPrivateMessage() function
+      const userId = data.userId as string
+      const text = data.message as string
+      if (!userId) throw new Error('ChatJob missing userId')
+      const account = data.account_id ? workerAccountsRepo.findById(data.account_id) : null
+      const rawCreds = readDecryptedCredentials(account?.credentials_encrypted)
+      if (!rawCreds) throw new Error('ChatJob: no credentials for account')
+      const result = await sendPrivateMessage(userId, text, rawCreds)
+      if (!result.success) {
+        const error = new Error(result.error ?? 'sendPrivateMessage failed')
+        ;(error as any).code = 'CHAT_FAILED'
+        try {
+          const { getDb } = await import('../db/sqlite')
+          const db = getDb()
+          db.prepare(`INSERT INTO logs (job_id, level, message, meta) VALUES (?, ?, ?, ?)`).run(
+            id, 'error', String(result.error ?? 'sendPrivateMessage failed'), JSON.stringify({ userId })
+          )
+        } catch { /* non-fatal */ }
+        throw error
+      }
+      console.log(`[worker] Facebook DM sent for job ${id} to user ${userId}`)
+      return
     }
     throw new Error('Unknown job type')
   })
 }
 
 export default initializeJobWorker
+

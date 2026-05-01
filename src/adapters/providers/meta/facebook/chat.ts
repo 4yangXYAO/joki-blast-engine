@@ -1,30 +1,28 @@
 import { createHttpClient, parseCookies } from '../../../../utils/http-client'
 
 /**
- * postComment — post a comment on a Facebook post.
+ * sendPrivateMessage — send a Facebook Messenger private message to a user.
  *
- * @param postId   Facebook post ID (e.g. "123456789_987654321" or just "987654321")
- * @param message  Comment text
+ * @param userId   Facebook user ID to send to (numeric string)
+ * @param message  Text content of the message
  * @param cookie   Raw browser session cookie string (c_user=...; xs=...; ...)
- * @returns { success: boolean, error?: string }
+ * @returns { success: boolean, error?: string, messageId?: string }
  */
-export async function postComment(
-  postId: string,
+export async function sendPrivateMessage(
+  userId: string,
   message: string,
   cookie: string
-): Promise<{ success: boolean; error?: string; commentId?: string }> {
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
   if (!cookie) return { success: false, error: 'Cookie not provided' }
-  if (!postId) return { success: false, error: 'postId not provided' }
+  if (!userId) return { success: false, error: 'userId not provided' }
   if (!message) return { success: false, error: 'message not provided' }
 
   const cookieHeader = parseCookies(cookie)
-
-  // Extract c_user
   const cUserMatch = cookieHeader.match(/\bc_user=([^;\s]+)/)
   const cUser = cUserMatch?.[1] ?? ''
 
   try {
-    // Step 1: Fetch www.facebook.com to get CSRF tokens
+    // Step 1: Fetch www.facebook.com to extract CSRF tokens
     const pageClient = createHttpClient({
       baseURL: 'https://www.facebook.com',
       timeout: 15_000,
@@ -40,7 +38,7 @@ export async function postComment(
     const pageRes = await pageClient.get('/')
     const html = String(pageRes?.data || '')
 
-    // Detect auth
+    // Detect login redirect
     if (
       html.includes('"login_form"') ||
       /action="https:\/\/www\.facebook\.com\/login/.test(html)
@@ -67,7 +65,7 @@ export async function postComment(
       return { success: false, error: 'Could not extract fb_dtsg — check cookie validity' }
     }
 
-    // Step 2: POST comment via GraphQL
+    // Step 2: Send message via Messenger GraphQL mutation
     const gqlClient = createHttpClient({
       baseURL: 'https://www.facebook.com',
       timeout: 20_000,
@@ -78,9 +76,9 @@ export async function postComment(
         'Content-Type': 'application/x-www-form-urlencoded',
         Accept: '*/*',
         Origin: 'https://www.facebook.com',
-        Referer: `https://www.facebook.com/`,
+        Referer: 'https://www.facebook.com/messages/',
         'X-FB-LSD': lsd,
-        'X-FB-Friendly-Name': 'CometUFIAddCommentMutation',
+        'X-FB-Friendly-Name': 'LSGraphQLRequest',
       },
     })
 
@@ -91,26 +89,23 @@ export async function postComment(
       __req: Math.random().toString(36).slice(2, 5),
       fb_dtsg: fbDtsg,
       lsd: lsd,
-      doc_id: '1612153915386838',
+      doc_id: '4949364150742317',
       variables: JSON.stringify({
         input: {
           client_mutation_id: String(Date.now()),
-          feedback_id: Buffer.from(`feedback:${postId}`).toString('base64'),
-          message: {
-            ranges: [],
-            text: message,
-          },
+          message: { text: message },
+          recipient_id: userId,
+          timestamp: Date.now(),
         },
-        UFICommentContainerPaginationQuery: false,
       }),
       fb_api_caller_class: 'RelayModern',
-      fb_api_req_friendly_name: 'CometUFIAddCommentMutation',
+      fb_api_req_friendly_name: 'LSGraphQLRequest',
     })
 
     const res = await gqlClient.post('/api/graphql/', params.toString())
     const responseText = String(res?.data ?? '')
 
-    // Auth check in response
+    // Auth check
     if (responseText.includes('"login_form"')) {
       return { success: false, error: 'Auth expired — login redirect in GraphQL response' }
     }
@@ -126,30 +121,30 @@ export async function postComment(
       }
     }
 
-    // Check for GraphQL errors
+    // Check GraphQL errors
     if (parsed?.errors?.length > 0) {
       const errMsg = parsed.errors[0]?.message ?? JSON.stringify(parsed.errors[0])
       return { success: false, error: `GraphQL error: ${errMsg}` }
     }
 
-    // Extract comment ID from response
-    const commentId: string | undefined =
-      parsed?.data?.comment_create?.feedback_comment?.id ||
-      parsed?.data?.commentCreate?.comment?.id ||
+    // Try to extract message ID from response
+    const messageId: string | undefined =
+      parsed?.data?.messenger_send_message?.message?.message_id ||
+      parsed?.data?.messageSend?.message?.id ||
       undefined
 
-    const ok = res?.status === 200 && (!!commentId || parsed?.data !== null)
+    const ok = res?.status === 200 && parsed?.data !== null
     return {
       success: ok,
-      commentId,
-      error: ok ? undefined : `Comment not confirmed. Response: ${responseText.slice(0, 300)}`,
+      messageId,
+      error: ok ? undefined : `Message not confirmed. Response: ${responseText.slice(0, 300)}`,
     }
   } catch (e: any) {
     return {
       success: false,
-      error: e?.message ?? 'postComment error',
+      error: e?.message ?? 'sendPrivateMessage error',
     }
   }
 }
 
-export default postComment
+export default sendPrivateMessage

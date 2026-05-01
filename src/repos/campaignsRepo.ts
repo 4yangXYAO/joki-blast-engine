@@ -16,7 +16,7 @@ export type CampaignPost = {
   campaign_id: string
   platform: string
   job_id?: string
-  status: string // pending | sent | failed
+  status: string // pending | submitted | posted | failed
   created_at?: string
 }
 
@@ -98,6 +98,13 @@ export class CampaignsRepo {
     db.prepare(`UPDATE campaign_posts SET status = ? WHERE id = ?`).run(status, postId)
   }
 
+  getPostByJobId(jobId: string): CampaignPost | null {
+    const db = this.getDatabase()
+    const row: any = db.prepare(`SELECT * FROM campaign_posts WHERE job_id = ? LIMIT 1`).get(jobId)
+    if (!row) return null
+    return row as CampaignPost
+  }
+
   markPostStatusByJobId(jobId: string, status: string): CampaignPost | null {
     const db = this.getDatabase()
     const row: any = db.prepare(`SELECT * FROM campaign_posts WHERE job_id = ? LIMIT 1`).get(jobId)
@@ -114,6 +121,61 @@ export class CampaignsRepo {
       )
       .get(campaignId)
     return Number(row?.count ?? 0) > 0
+  }
+
+  // ✅ FIX #7: Atomic update to prevent campaign status race condition
+  // Atomically: 1) mark post status, 2) check pending posts, 3) update campaign status
+  atomicMarkPostAndUpdateCampaign(
+    jobId: string,
+    postStatus: string
+  ): { post: CampaignPost | null; campaignUpdated: boolean } {
+    const db = this.getDatabase()
+    let post: CampaignPost | null = null
+    let campaignUpdated = false
+
+    // Use transaction to ensure atomic operations
+    try {
+      db.exec('BEGIN TRANSACTION')
+
+      // Get existing post
+      const row: any = db
+        .prepare(`SELECT * FROM campaign_posts WHERE job_id = ? LIMIT 1`)
+        .get(jobId)
+      if (!row) {
+        db.exec('ROLLBACK')
+        return { post: null, campaignUpdated: false }
+      }
+
+      post = row as CampaignPost
+
+      // Update post status
+      db.prepare(`UPDATE campaign_posts SET status = ? WHERE job_id = ?`).run(postStatus, jobId)
+
+      // Check if any pending posts remain for this campaign
+      const pending: any = db
+        .prepare(
+          `SELECT COUNT(1) AS count FROM campaign_posts WHERE campaign_id = ? AND status = 'pending'`
+        )
+        .get(post.campaign_id)
+
+      // If no pending posts, mark campaign as completed
+      if (Number(pending?.count ?? 0) === 0) {
+        db.prepare(`UPDATE campaigns SET status = ? WHERE id = ?`).run(
+          'completed',
+          post.campaign_id
+        )
+        campaignUpdated = true
+      }
+
+      db.exec('COMMIT')
+    } catch (err) {
+      try {
+        db.exec('ROLLBACK')
+      } catch {}
+      throw err
+    }
+
+    return { post: post ? { ...post, status: postStatus } : null, campaignUpdated }
   }
 
   private parsePlatforms(raw: string): string[] {

@@ -11,9 +11,8 @@ function isFacebookPlatform(platform: string) {
   return platform === 'facebook' || platform === 'facebook-page'
 }
 
-function buildFacebookCredentials(pageId: string, accessToken: string) {
-  return JSON.stringify({ pageId, accessToken })
-}
+const FACEBOOK_ACCOUNT_HELP_TEXT =
+  'Paste a Facebook session cookie string here. Do not enter a Page ID, a Page Access Token, or a personal password.'
 
 const INTEGRATION_FIELDS = [
   { key: 'WHATSAPP_CLOUD_API_TOKEN', label: 'WhatsApp Cloud API Token', placeholder: 'EAA...' },
@@ -51,8 +50,7 @@ type AccountFormState = {
   platform: string
   username: string
   credentials: string
-  facebookPageId: string
-  facebookAccessToken: string
+  facebookCookie: string
 }
 
 type TemplateFormState = {
@@ -103,8 +101,7 @@ export default function Page() {
     platform: 'whatsapp',
     username: 'test_account',
     credentials: 'secret-token',
-    facebookPageId: '',
-    facebookAccessToken: '',
+    facebookCookie: '',
   })
   const [templateForm, setTemplateForm] = useState<TemplateFormState>({
     name: 'Promo',
@@ -245,15 +242,12 @@ export default function Page() {
     setActionState('Creating account...')
     try {
       const credentials = isFacebookPlatform(accountForm.platform)
-        ? buildFacebookCredentials(
-            accountForm.facebookPageId.trim(),
-            accountForm.facebookAccessToken.trim()
-          )
+        ? accountForm.facebookCookie.trim()
         : accountForm.credentials
 
       if (isFacebookPlatform(accountForm.platform)) {
-        if (!accountForm.facebookPageId.trim() || !accountForm.facebookAccessToken.trim()) {
-          throw new Error('Facebook Page ID and Access Token are required')
+        if (!accountForm.facebookCookie.trim()) {
+          throw new Error('Facebook session cookie is required')
         }
       } else if (!accountForm.credentials.trim()) {
         throw new Error('Credential is required')
@@ -573,8 +567,8 @@ export default function Page() {
         <section id="accounts" className="card">
           <h2>Create Account</h2>
           <p className="muted">
-            For Facebook Pages, enter the Page ID and Access Token. The dashboard will package them
-            into the JSON payload expected by the worker.
+            For Facebook, paste the full browser session cookie string. The cookie is stored
+            encrypted and used to authenticate with m.facebook.com.
           </p>
           <label>Platform</label>
           <select
@@ -602,26 +596,29 @@ export default function Page() {
           />
           {isFacebookPlatform(accountForm.platform) ? (
             <>
-              <label>Facebook Page ID</label>
-              <input
+              <small className="muted">
+                Use the full Facebook session cookie string from a logged-in browser session. It
+                should include values like <strong>c_user</strong>, <strong>xs</strong>, and
+                <strong>datr</strong>.
+              </small>
+              <label>Facebook Session Cookie</label>
+              <textarea
                 className="input"
-                value={accountForm.facebookPageId}
-                onChange={(event) =>
-                  setAccountForm((current) => ({ ...current, facebookPageId: event.target.value }))
-                }
-              />
-              <label>Facebook Access Token</label>
-              <input
-                className="input"
-                type="password"
-                value={accountForm.facebookAccessToken}
+                rows={4}
+                placeholder="c_user=...; xs=...; datr=...; sb=..."
+                value={accountForm.facebookCookie}
                 onChange={(event) =>
                   setAccountForm((current) => ({
                     ...current,
-                    facebookAccessToken: event.target.value,
+                    facebookCookie: event.target.value,
                   }))
                 }
               />
+              <small className="muted">
+                Paste the cookie exactly as copied from the browser. Do not trim away parts of the
+                string.
+              </small>
+              <small className="muted">{FACEBOOK_ACCOUNT_HELP_TEXT}</small>
             </>
           ) : (
             <>
@@ -702,6 +699,10 @@ export default function Page() {
               </option>
             ))}
           </select>
+          <small className="muted">
+            Select the Facebook Page account created above. If the list is empty, create the Page
+            account first by entering the Page ID and Page Access Token.
+          </small>
           <label>Campaign Name</label>
           <input
             className="input"
@@ -878,16 +879,6 @@ export default function Page() {
                 {templates.slice(0, 5).map((template) => (
                   <li key={template.id}>
                     {template.name} - {template.type}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3>Campaigns</h3>
-              <ul>
-                {campaigns.slice(0, 5).map((campaign) => (
-                  <li key={campaign.id}>
-                    {campaign.name} - {campaign.status}
                   </li>
                 ))}
               </ul>

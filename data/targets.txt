@@ -1,0 +1,50 @@
+# Facebook Blast Targets
+# ---------------------
+# One Facebook user ID or post ID per line.
+# Lines starting with # are comments and are ignored.
+# Blank lines are ignored.
+#
+# ─── FOR COMMENT BLAST ───────────────────────────────────────────────────────
+# Use post IDs. Format: {userId}_{postId}  OR  just the numeric post ID.
+# Example:
+# 100012345678901_1234567890123456
+# 561234567890_123456789012345
+#
+# ─── FOR CHAT BLAST ──────────────────────────────────────────────────────────
+# Use numeric Facebook user IDs (profile IDs, not usernames).
+# To find a user ID:
+#   1. Go to their Facebook profile
+#   2. Right-click → View Page Source → search for "userID" or "profile_id"
+#   3. Or use: https://findmyfbid.in/
+# Example:
+# 100012345678901
+# 100023456789012
+# 100034567890123
+#
+# ─── HOW TO FILL THIS FILE ───────────────────────────────────────────────────
+# Add target IDs one per line below this block.
+# The system will randomly pick up to 50 targets per blast run.
+# ---------------------------------------------------------------------------
+
+# Sample comment targets
+100012345678901_987654321
+100056789012345_123456789
+100023456789012_234567890
+100034567890123_345678901
+100045678901234_456789012
+100056789012345_567890123
+100067890123456_678901234
+100078901234567_789012345
+100089012345678_890123456
+100090123456789_901234567
+100112345678901_912345678
+100223456789012_923456789
+100334567890123_934567890
+100445678901234_945678901
+100556789012345_956789012
+100667890123456_967890123
+100778901234567_978901234
+100889012345678_989012345
+100990123456789_990123456
+101001234567890_901234567
+

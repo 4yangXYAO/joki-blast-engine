@@ -3,7 +3,7 @@ import cors from 'cors'
 import helmet from 'helmet'
 import { createLogger, transports, format } from 'winston'
 import { loadConfig, getConfig } from '../config/secrets'
-import { initDatabase, runMigrations } from '../db/sqlite'
+import { initDatabase, initSqlJsDatabase, runMigrations } from '../db/sqlite'
 import { accountsRouter } from '../routes/accounts'
 import { templatesRouter } from '../routes/templates'
 import { postsRouter } from '../routes/posts'
@@ -42,35 +42,55 @@ export function wireCampaignStatusSync(
   queue: typeof defaultJobQueue,
   campaignsRepo = new CampaignsRepo()
 ) {
+  // ✅ FIX #7: Use atomic transaction for campaign status updates
   queue.on('completed', (jobId: string) => {
-    const post = campaignsRepo.markPostStatusByJobId(jobId, 'posted')
-    if (post) {
-      const pending = campaignsRepo.hasPendingPosts(post.campaign_id)
-      if (!pending) {
-        campaignsRepo.updateStatus(post.campaign_id, 'completed')
-      }
-    }
+    const existingPost = campaignsRepo.getPostByJobId(jobId)
+    const completedStatus = existingPost?.platform === 'facebook' ? 'submitted' : 'posted'
+    campaignsRepo.atomicMarkPostAndUpdateCampaign(jobId, completedStatus)
   })
 
   queue.on('failed', (jobId: string) => {
-    const post = campaignsRepo.markPostStatusByJobId(jobId, 'failed')
-    if (post) {
-      const pending = campaignsRepo.hasPendingPosts(post.campaign_id)
-      if (!pending) {
-        campaignsRepo.updateStatus(post.campaign_id, 'completed')
-      }
-    }
+    campaignsRepo.atomicMarkPostAndUpdateCampaign(jobId, 'failed')
   })
 }
 
-export function startServer() {
+export async function startServer() {
   loadConfig()
   const cfg = getConfig()
-  // Initialize DB and run migrations
+  // Initialize DB and run migrations. Prefer native better-sqlite3 but fall
+  // back to sql.js (WASM) if the native module can't be loaded (useful when
+  // running under a different Node version where native binaries aren't built).
   const dbPath = cfg.DATABASE_PATH || 'data/app.db'
-  initDatabase(dbPath)
+  try {
+    initDatabase(dbPath)
+  } catch (err) {
+    // Log warning and silently fall back to sql.js
+    // eslint-disable-next-line no-console
+    console.warn('better-sqlite3 unavailable, falling back to sql.js (WASM):', err?.message ?? err)
+    // Await async sql.js initialization
+    // If this throws, we let it propagate to the caller
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    await initSqlJsDatabase(dbPath)
+  }
   runMigrations('./migrations')
+
+  // ✅ FIX #6: Validate port configuration to prevent collisions
   const port = Number(cfg.API_PORT) || 3000
+  const dashboardPort = Number(process.env.DASHBOARD_PORT || 3001)
+  const wahaPort = Number(process.env.WAHA_BASE_URL?.split(':').pop() || 3000)
+
+  // Check for port conflicts
+  const allPorts = [port, dashboardPort]
+  const uniquePorts = new Set(allPorts)
+
+  if (uniquePorts.size !== allPorts.length) {
+    const duplicatePorts = allPorts.filter((p, i) => allPorts.indexOf(p) !== i)
+    throw new Error(
+      `❌ PORT CONFLICT: Duplicate ports detected: ${[...new Set(duplicatePorts)].join(', ')}. ` +
+        `Set API_PORT=${port}, DASHBOARD_PORT=${dashboardPort} to different values.`
+    )
+  }
+
   const app = createServer()
   app.use('/v1/accounts', accountsRouter)
   app.use('/v1/templates', templatesRouter)

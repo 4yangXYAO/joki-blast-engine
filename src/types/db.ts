@@ -87,7 +87,7 @@ export interface CampaignPost {
   campaign_id: string
   platform: string
   job_id: string | null
-  status: string // 'pending' | 'posted' | 'failed'
+  status: string // 'pending' | 'submitted' | 'posted' | 'failed'
   created_at: string
 }
 

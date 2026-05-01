@@ -2,6 +2,9 @@
   "name": "joki-blast-dashboard",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=20.20.0 <21"
+  },
   "scripts": {
     "dev": "next dev -p 3001",
     "build": "next build",
