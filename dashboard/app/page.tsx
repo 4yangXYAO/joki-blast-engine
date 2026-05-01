@@ -525,6 +525,14 @@ export default function Page() {
         </section>
 
         <section className="card">
+          <h2>Blast Runner</h2>
+          <p className="muted">Multi-platform auto blast with randomized actions.</p>
+          <a className="button" href="/blast-runner">
+            Open
+          </a>
+        </section>
+
+        <section className="card">
           <h2>Jobs (Legacy)</h2>
           <p className="muted">Schedule and trigger posts (old flow).</p>
           <a className="button" href="#jobs-old">

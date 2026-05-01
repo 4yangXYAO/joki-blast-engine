@@ -13,6 +13,7 @@ import { webhooksRouter } from '../routes/webhooks'
 import { settingsRouter } from '../routes/settings'
 import { createCampaignsRouter } from '../routes/campaigns'
 import { trackRouter } from '../routes/track'
+import { blastRouter } from '../routes/blast'
 import { CampaignsRepo } from '../repos/campaignsRepo'
 import initializeJobWorker from '../workers/job-worker'
 import type { Request, Response, NextFunction } from 'express'
@@ -102,6 +103,7 @@ export async function startServer() {
   app.use('/v1/settings', settingsRouter)
   app.use('/v1/campaigns', createCampaignsRouter(defaultJobQueue))
   app.use('/v1/track', trackRouter)
+  app.use('/v1/blast', blastRouter)
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     logger.error(err?.message ?? 'Unhandled error')
     res.status(500).json({ error: err?.message ?? 'Internal Server Error' })
